@@ -1,10 +1,15 @@
 import { db } from '../firebase'
 import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit, getDoc } from 'firebase/firestore'
 import { COL } from '../paths'
+import { checkRateLimit } from '../rateLimit'
 
 export async function addComment(albumId: string, userId: string, body: string) {
   if (!body.trim()) throw new Error('EMPTY')
   if (body.length > 200) throw new Error('TOO_LONG')
+  
+  // レート制限チェック
+  await checkRateLimit('comment')
+  
   const ref = await addDoc(collection(db, COL.comments), { albumId, userId, body, createdAt: new Date() })
   await updateDoc(ref, { id: ref.id })
   // 通知: アルバムオーナーとコメント投稿者が異なる場合

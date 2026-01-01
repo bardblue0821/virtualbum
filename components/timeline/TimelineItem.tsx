@@ -427,7 +427,7 @@ export function TimelineItem(props: {
         )}
       </header>
 
-      <div className={`overflow-hidden rounded ${isFriend ? 'bg-friend/10 p-1' : isWatched ? 'bg-watch/10 p-1' : ''}`}>
+      <div className={`overflow-hidden ${isFriend ? 'bg-friend/10' : isWatched ? 'bg-watch/10' : ''}`}>
         {renderGrid(images)}
       </div>
 

@@ -1,6 +1,7 @@
 import { db } from '../firebase'
 import { collection, addDoc, query, where, doc, updateDoc, deleteDoc, limit, startAfter, orderBy } from 'firebase/firestore'
 import { COL } from '../paths'
+import { checkRateLimit } from '../rateLimit'
 
 // 動的 import で getDocs を遅延 (SSR 環境回避 & バンドル最適化軽微)
 async function countUserImages(albumId: string, uploaderId: string) {
@@ -21,6 +22,9 @@ export async function canUploadMoreImages(albumId: string, uploaderId: string) {
  * アクセス権限が必要です。AlbumImageUploader では /api/images/register を使用してください。
  */
 export async function addImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string) {
+  // レート制限チェック
+  await checkRateLimit('image')
+  
   const current = await countUserImages(albumId, uploaderId)
   if (current >= 4) throw new Error('LIMIT_4_PER_USER')
   const data: any = { albumId, uploaderId, url, createdAt: new Date() }

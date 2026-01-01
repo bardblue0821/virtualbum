@@ -2,6 +2,7 @@ import { db } from "../firebase";
 import { COL } from "../paths";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { getUser } from "./userRepo";
+import { checkRateLimit } from '../rateLimit';
 
 export type ReactionCount = { emoji: string; count: number; mine: boolean };
 
@@ -17,6 +18,9 @@ export async function toggleReaction(albumId: string, userId: string, emoji: str
     await deleteDoc(ref);
     return { removed: true } as const;
   } else {
+    // リアクション追加時のみレート制限チェック
+    await checkRateLimit('reaction');
+    
     await import("firebase/firestore").then(async ({ setDoc, serverTimestamp }) => {
       await setDoc(ref, { albumId, userId, emoji, createdAt: serverTimestamp?.() ?? new Date() });
     });

@@ -1,6 +1,7 @@
 import { db } from '../firebase'
 import { doc, getDoc, setDoc, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore'
 import { COL } from '../paths'
+import { checkRateLimit } from '../rateLimit'
 
 // 拡張ユーザー型 (後方互換: 既存ドキュメントに無いフィールドは undefined/null 扱い)
 export interface UserDoc {
@@ -28,6 +29,9 @@ export async function getUser(uid: string): Promise<UserDoc | null> {
 }
 
 export async function createUser(uid: string, displayName: string, handle?: string) {
+  // ユーザー登録時のレート制限チェック
+  await checkRateLimit('register')
+  
   const now = new Date()
   await setDoc(doc(db, COL.users, uid), { uid, displayName, handle: handle || null, createdAt: now })
 }

@@ -1,8 +1,12 @@
 import { db } from '../firebase'
 import { collection, addDoc, doc, getDoc, updateDoc, orderBy, limit, query, where, deleteDoc } from 'firebase/firestore'
 import { COL } from '../paths'
+import { checkRateLimit } from '../rateLimit'
 
 export async function createAlbum(ownerId: string, data: { title?: string; placeUrl?: string; visibility?: 'public' | 'friends' }) {
+  // レート制限チェック
+  await checkRateLimit('album')
+  
   const now = new Date()
   return await addDoc(collection(db, COL.albums), {
     ownerId,

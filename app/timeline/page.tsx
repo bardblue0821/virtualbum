@@ -12,6 +12,7 @@ import { toggleReaction } from "../../lib/repos/reactionRepo";
 import { addNotification } from "../../lib/repos/notificationRepo";
 import { toggleRepost, subscribeReposts } from "../../lib/repos/repostRepo";
 import { translateError } from "../../lib/errors";
+import { isRateLimitError } from "../../lib/rateLimit";
 import { notifications } from "@mantine/notifications";
 import DeleteConfirmModal from "../../components/album/DeleteConfirmModal";
 import ReportConfirmModal from "../../components/album/ReportConfirmModal";
@@ -478,7 +479,7 @@ export default function TimelinePage() {
             message: 'アルバムにリアクション: ' + emoji,
           }).catch(()=>{});
         }
-      } catch {
+      } catch (e: any) {
       // 失敗時ロールバック: 再取得のコストを避け簡易ロールバック
       updateRowByAlbumId(albumId, (row) => {
         const list = row.reactions.slice();
@@ -496,6 +497,9 @@ export default function TimelinePage() {
         }
         return { ...row, reactions: list };
       });
+      if (isRateLimitError(e)) {
+        notifications.show({ message: e.message, color: 'red' });
+      }
       }
     })();
   }
@@ -567,8 +571,12 @@ export default function TimelinePage() {
       if (!res.ok) {
         await addComment(albumId, user.uid, text);
       }
-    } catch {
-      await addComment(albumId, user.uid, text);
+    } catch (e: any) {
+      if (isRateLimitError(e)) {
+        notifications.show({ message: e.message, color: 'red' });
+      } else {
+        await addComment(albumId, user.uid, text);
+      }
     }
   }
 

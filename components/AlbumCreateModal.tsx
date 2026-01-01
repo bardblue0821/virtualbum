@@ -4,6 +4,7 @@ import { useAuthUser } from '../lib/hooks/useAuthUser';
 import { createAlbumWithImages, AlbumCreateProgress } from '../lib/services/createAlbumWithImages';
 import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
+import { isRateLimitError } from '../lib/rateLimit';
 import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } from '@mantine/core';
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { useToast } from './ui/Toast';
@@ -205,7 +206,12 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       router.push(`/album/${albumId}`);
     } catch (err: any) {
       console.error('[AlbumCreateModal] submit error', err);
-      setError(translateError(err));
+      if (isRateLimitError(err)) {
+        toast.error(err.message);
+        setError(null);
+      } else {
+        setError(translateError(err));
+      }
     } finally {
       setLoading(false);
       console.log('[AlbumCreateModal] submit end');

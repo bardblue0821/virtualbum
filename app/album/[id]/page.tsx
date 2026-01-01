@@ -27,6 +27,7 @@ import {
   subscribeLikes,
 } from "../../../lib/repos/likeRepo";
 import { translateError } from "../../../lib/errors";
+import { isRateLimitError } from "../../../lib/rateLimit";
 import { CommentList } from "../../../components/comments/CommentList";
 import { listComments, subscribeComments } from "../../../lib/repos/commentRepo";
 import { CommentForm } from "../../../components/comments/CommentForm";
@@ -406,7 +407,11 @@ export default function AlbumDetailPage() {
     } catch (e:any) {
       // ロールバック
       setReactions(prev);
-      setError(translateError(e));
+      if (isRateLimitError(e)) {
+        toast.error(e.message);
+      } else {
+        setError(translateError(e));
+      }
     }
   }
 
@@ -669,7 +674,11 @@ export default function AlbumDetailPage() {
       }
       setCommentText("");
     } catch (e: any) {
-      setError(translateError(e));
+      if (isRateLimitError(e)) {
+        toast.error(e.message);
+      } else {
+        setError(translateError(e));
+      }
     } finally {
       setCommenting(false);
     }

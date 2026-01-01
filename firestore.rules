@@ -10,6 +10,10 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
     // フレンド関係およびアルバム可視性の簡易チェック
     function isFriendWith(otherId) {
       return isSignedIn() && (
@@ -183,6 +187,14 @@ service cloud.firestore {
     // その他のパスは閉じる
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // rateLimits/{userId}/actions/{action}
+    match /rateLimits/{userId}/actions/{action} {
+      // 本人または管理者のみが読み取り可能
+      allow read: if isUser(userId) || isAdmin();
+      // Cloud Functionsからのみ書き込み可能（request.authがnullの場合はサーバー側からのアクセス）
+      allow write: if false;
     }
   }
 }

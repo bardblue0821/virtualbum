@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore, initializeFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
+import { getFunctions } from 'firebase/functions'
 // import { getAnalytics } from 'firebase/analytics' // ブラウザ限定で使う場合のみ
 
 const firebaseConfig = {
@@ -26,4 +27,5 @@ try {
 }
 export const db = _db
 export const storage = getStorage(app)
+export const functions = getFunctions(app)
 // export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null
