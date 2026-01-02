@@ -7,9 +7,11 @@
 **技術スタック:**
 - **フロントエンド:** Next.js 16.1 (App Router), React 19.2, TypeScript 5
 - **バックエンド/DB:** Firebase Authentication, Firestore, Storage, Admin SDK
-- **UI:** Mantine 7, Tailwind CSS
-- **画像処理:** react-easy-crop (アバター切り抜き), lightgallery (ギャラリービューアー)
-- **その他:** Nodemailer (メール送信予定)
+- **UI:** Mantine 7, Tailwind CSS 4
+- **画像処理:** react-easy-crop (アバター切り抜き), react-image-crop, lightgallery (ギャラリービューアー)
+- **画像表示:** react-photo-album (レスポンシブグリッド)
+- **テスト:** Jest 29.7, React Testing Library 16.3
+- **その他:** Nodemailer 7.0 (メール送信), Prisma 7.0 (PostgreSQL連携予定), react-intersection-observer (無限スクロール)
 
 ---
 
@@ -62,6 +64,12 @@ Tailwind CSS の基本スタイルとカスタム変数（カラースキーム�
 
 #### `app/notification/page.tsx`
 **通知一覧画面**。コメント、いいね、フレンド申請、ウォッチ、リポスト、リアクションの通知をリアルタイム購読で表示します。既読一括マークにも対応します。
+
+#### `app/forgot-password/page.tsx`
+**パスワード忘れページ**。メールアドレスを入力してパスワードリセットメールを送信します。中立的なメッセージでアカウント存在の列挙攻撃を防止します。
+
+#### `app/reset-password/page.tsx`
+**パスワードリセットページ**。メールから送られたリンクをクリックして新しいパスワードを設定します。
 
 #### `app/login/page.tsx`
 **ログインページ**。メールアドレス＋パスワードでログインします。エラーメッセージ表示とログイン後リダイレクトを処理します。
@@ -421,7 +429,10 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `app/login/page.tsx` (ログインページ)
   - `app/register/page.tsx` (新規登録ページ)
   - `app/register/complete/page.tsx` (登録完了ページ)
+  - `app/forgot-password/page.tsx` (パスワード忘れページ)
+  - `app/reset-password/page.tsx` (パスワードリセットページ)
 - **セキュリティルール:** users コレクションで本人のみ create/update 可能
+- **実装状況:** ✅ 完了（パスワードリセット機能を含む）
 
 ### 2. アルバム管理
 
@@ -433,19 +444,20 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `components/album/AlbumActionsMenu.tsx` (操作メニュー)
   - `lib/services/createAlbumWithImages.ts` (一括作成サービス)
 - **セキュリティルール:** albums コレクション（オーナーのみ更新/削除可）
+- **実装状況:** ✅ 完了
 
 ### 3. 画像アップロード・管理
 
 - **実装ファイル:**
   - `lib/repos/imageRepo.ts` (画像 CRUD)
-  - `components/upload/ImageUploadFlow.tsx` (アップロードフロー)
-  - `components/upload/ImageDropzone.tsx` (ドロップゾーン)
-  - `components/upload/ImagePreviewGrid.tsx` (プレビュー)
+  - `components/upload/AlbumImageUploader.tsx` (アップローダー)
+  - `components/upload/AlbumImageCropper.tsx` (画像トリミング)
   - `components/gallery/ImageGrid.tsx` (画像グリッド)
   - `components/gallery/GalleryViewer.tsx` (lightgallery ビューアー)
   - `app/api/images/add/route.ts` (画像追加 API)
   - `app/api/images/delete/route.ts` (画像削除 API)
 - **セキュリティルール:** albumImages コレクション（uploaderId 本人またはアルバムオーナーが削除可）
+- **実装状況:** ✅ 完了
 
 ### 4. タイムライン表示
 
@@ -455,6 +467,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `lib/repos/timelineRepo.ts` (タイムライン用クエリ)
   - `components/timeline/TimelineItem.tsx` (タイムライン 1 行 UI)
 - **特徴:** 自分、フレンド、ウォッチユーザーの投稿を集約、無限スクロール、リアルタイム購読
+- **実装状況:** ✅ 完了
 
 ### 5. ソーシャル機能（フレンド・ウォッチ）
 
@@ -466,6 +479,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `components/profile/FriendRemoveConfirmModal.tsx` (解除確認ダイアログ)
   - `app/user/[id]/page.tsx` (プロフィール画面で操作)
 - **セキュリティルール:** friends/watches コレクションで本人のみ作成/削除可能
+- **実装状況:** ✅ 完了
 
 ### 6. インタラクション（いいね・コメント・リポスト・リアクション）
 
@@ -481,6 +495,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `components/comments/CommentItem.tsx`, `CommentInput.tsx` (コメント UI)
   - `components/timeline/ReactionSummary.tsx`, `ReactionPickerPopover.tsx` (リアクション UI)
 - **セキュリティルール:** likes/reposts/reactions/comments で canReadAlbum チェック、本人のみ削除可能
+- **実装状況:** ✅ 完了
 
 ### 7. 通知機能
 
@@ -489,6 +504,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `app/notification/page.tsx` (通知一覧画面)
   - `components/icons/BellIcon.tsx` (通知アイコン)
 - **セキュリティルール:** notifications コレクションで本人のみ読み取り、actorId 本人のみ作成、既読化のみ update 可能
+- **実装状況:** ✅ 完了
 
 ### 8. 検索機能
 
@@ -497,6 +513,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `app/search/page.tsx` (検索画面)
   - `components/icons/SearchIcon.tsx` (検索アイコン)
 - **特徴:** handle/displayName の部分一致検索（インデックス要）
+- **実装状況:** ✅ 完了（ユーザー検索のみ、アルバム検索は未実装）
 
 ### 9. ブロック機能（未実装）
 
@@ -506,6 +523,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `app/user/[id]/page.tsx` にブロック UI 追加
   - `src/services/timeline/listLatestAlbums.ts` でブロックユーザーフィルタリング追加
 - **仕様:** Twitter 相当の相互ブロック、投稿非表示、コメント非表示、フレンド/ウォッチ強制解除
+- **実装状況:** ❌ 未実装
 
 ### 10. プロフィール編集
 
@@ -516,6 +534,7 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `components/profile/AvatarCropper.tsx` (画像トリミング UI)
   - `lib/services/avatar.ts` (アバターアップロードサービス)
 - **特徴:** handle, displayName, bio, アイコン、カバー画像、バナー画像の編集に対応
+- **実装状況:** ✅ 完了
 
 ### 11. アカウント削除
 
@@ -523,13 +542,19 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `lib/services/deleteAccount.ts` (アカウント削除サービス、実装中)
   - `app/user/[id]/page.tsx` (削除フローと確認ダイアログ)
 - **仕様:** ユーザー情報、アルバム、画像、コメント、フレンド申請などを一括削除（Storage も削除予定）
+- **実装状況:** 🔶 実装中
 
-### 12. パスワードリセット（未実装）
+### 12. パスワードリセット
 
-- **実装予定:**
-  - Firebase Auth のパスワードリセット機能（メール送信）
-  - 第三者による変更防止、メールアドレス存在漏洩防止の設計
-  - 中立的なメッセージ、CAPTCHA、レート制限を追加予定
+- **実装ファイル:**
+  - `app/forgot-password/page.tsx` (パスワード忘れページ)
+  - `app/reset-password/page.tsx` (パスワードリセットページ)
+  - Firebase Auth のパスワードリセット機能を使用
+- **特徴:**
+  - 第三者による変更防止（メールリンク経由のみ）
+  - メールアドレス存在漏洩防止（中立的なメッセージ）
+  - 今後の拡張: CAPTCHA、レート制限の追加
+- **実装状況:** ✅ 基本機能完了（CAPTCHA/レート制限は未実装）
 
 ### 13. テーマ切り替え（未実装）
 
@@ -537,6 +562,29 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
   - `components/ThemeSwitch.tsx` (ライト/ダーク切り替えスイッチ)
   - Mantine の useMantineColorScheme で動的切り替え
 - **現状:** ColorSchemeScript は導入済みだが、UI 未完成
+- **実装状況:** ❌ 未実装
+
+---
+
+## テスト
+
+### テストフレームワーク
+- **Jest 29.7** + **React Testing Library 16.3**
+- **設定ファイル:** `jest.config.js`, `jest.setup.ts`
+
+### テストファイル
+- `lib/repos/__tests__/` - リポジトリ層のユニットテスト
+
+### テスト実行
+```bash
+npm run test       # すべてのテストを実行
+npm run test:watch # ウォッチモードで実行
+```
+
+### 実装状況
+- ✅ テスト環境構築完了
+- 🔶 一部リポジトリのテスト実装中
+- ❌ E2E テスト未実装
 
 ---
 
@@ -545,17 +593,35 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
 ### 未実装
 
 1. **ブロック機能**: blockRepo.ts は空ファイル、firestore.rules にもルール未定義
-2. **パスワードリセット**: Firebase Auth のリセット機能は利用可能だが、カスタム実装（中立メッセージ、CAPTCHA）は未着手
-3. **テーマ切り替え UI**: ColorSchemeScript は準備済みだが、UI ボタンは非表示またはコメントアウト状態
-4. **Discord Webhook 共有**: app/api/share/discord/route.ts はエンドポイントのみ存在、実装未完了
-5. **アルバム通報機能**: app/api/reports/album/route.ts はエンドポイントのみ存在、モデレーション機能未実装
-6. **アルバム検索**: searchRepo.ts はユーザー検索のみ実装、アルバム検索は未対応
+2. **テーマ切り替え UI**: ColorSchemeScript は準備済みだが、UI ボタンは非表示またはコメントアウト状態
+3. **Discord Webhook 共有**: app/api/share/discord/route.ts はエンドポイントのみ存在、実装未完了
+4. **アルバム通報機能**: app/api/reports/album/route.ts はエンドポイントのみ存在、モデレーション機能未実装
+5. **アルバム検索**: searchRepo.ts はユーザー検索のみ実装、アルバム検索は未対応
+6. **CAPTCHA/レート制限**: パスワードリセットに中立メッセージはあるが、CAPTCHA とレート制限は未実装
+7. **E2E テスト**: Playwright または Cypress による E2E テスト環境未構築
 
 ### 実装中
 
 1. **アカウント削除サービス**: deleteAccount.ts は部分実装、Storage 削除やトランザクション処理が未完成
 2. **メール確認リンク送信**: sendVerificationDev.ts は Nodemailer 設定が未完成
 3. **プロフィール画面の詳細**: app/user/[id]/page.tsx は機能豊富だが、参加アルバム・コメント・画像タブの集計ロジックが一部不完全
+4. **ユニットテスト**: 一部リポジトリのテストは実装済みだが、カバレッジは不完全
+
+---
+
+## パフォーマンス最適化
+
+### 実装済みの最適化
+1. **無限スクロール**: react-intersection-observer を使用したタイムラインの段階的読み込み
+2. **画像の遅延読み込み**: lightgallery と react-photo-album による最適化
+3. **リアルタイム購読の最適化**: 可視範囲のアイテムのみ購読（タイムライン）
+4. **クエリの最適化**: Firestore インデックスの活用
+
+### 今後の最適化課題
+1. **N+1 問題の解消**: タイムライン表示時のバッチ取得実装
+2. **画像リサイズ**: Firebase Storage Extensions による自動サムネイル生成
+3. **キャッシュ戦略**: React Query の導入検討
+4. **コード分割**: Next.js の dynamic import 活用
 
 ---
 
@@ -585,20 +651,21 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
 ### コードスタイル
 
 - TypeScript strict モード有効
-- ESLint + Prettier でコードフォーマット統一（設定ファイル存在確認）
+- ESLint でコードフォーマット統一（`eslint.config.mjs`）
 - コンポーネントは "use client" ディレクティブで明示的にクライアント化
 
 ### テスト
 
-- ユニットテスト: Jest + React Testing Library（未導入）
+- ユニットテスト: Jest 29.7 + React Testing Library 16.3（導入済み）
 - E2E テスト: Playwright または Cypress（未導入）
+- テストコマンド: `npm run test`, `npm run test:watch`
 
 ---
 
 ## 今後の拡張予定
 
 1. **ブロック機能の完全実装**: blockRepo.ts の実装、firestore.rules への追加、タイムライン/プロフィールでのフィルタリング
-2. **パスワードリセットのカスタム実装**: 中立メッセージ、CAPTCHA、レート制限付きの安全な実装
+2. **パスワードリセットの強化**: CAPTCHA、レート制限付きの安全な実装（基本機能は実装済み）
 3. **テーマ切り替え UI の完成**: ライト/ダークモード切り替えボタンの実装
 4. **アルバム検索機能**: タイトル・タグでの検索、フルテキスト検索の導入
 5. **通報・モデレーション機能**: アルバム通報の処理フロー、管理者用ダッシュボード
@@ -607,18 +674,54 @@ canReadAlbum(albumId): アルバムが public またはフレンド限定で権�
 8. **リアクション絵文字のカスタマイズ**: ユーザーがカスタム絵文字を追加できる機能
 9. **タグ機能**: アルバムにタグを付けて分類・検索できる機能
 10. **統計・分析機能**: いいね数ランキング、人気アルバム表示など
+11. **テストカバレッジの拡充**: E2E テスト環境構築、ユニットテストのカバレッジ向上
 
 ---
 
 ## まとめ
 
-本プロジェクトは、Next.js App Router + Firebase を軸にしたフォト共有 SNS として、基本的なソーシャル機能（フレンド、ウォッチ、いいね、コメント、リポスト、リアクション）を実装済みです。Firestore セキュリティルールは読み取りを permissive にしてクライアント側フィルタリングで柔軟性を確保し、書き込みは厳格にチェックする設計になっています。
+本プロジェクトは、Next.js 16.1 App Router + Firebase を軸にしたフォト共有 SNS として、以下の機能を実装しています：
 
-未実装機能（ブロック、パスワードリセット、テーマ切り替え、アルバム検索、通報）については、今後の拡張ロードマップに含まれており、段階的に実装予定です。
+### ✅ 実装済み機能
+- **認証機能**: メール/パスワード登録、ログイン、パスワードリセット
+- **アルバム管理**: 作成、編集、削除、公開設定（public/friends）
+- **画像管理**: アップロード、トリミング、削除、ギャラリー表示
+- **タイムライン**: 無限スクロール、リアルタイム更新
+- **ソーシャル機能**: フレンド申請/承認、ウォッチ機能
+- **インタラクション**: いいね、コメント、リポスト、絵文字リアクション
+- **通知機能**: リアルタイム通知、既読管理
+- **検索機能**: ユーザー検索（handle/displayName）
+- **プロフィール**: 編集、アイコン/カバー/バナー画像設定
+- **テスト環境**: Jest + React Testing Library
+
+### 🔶 実装中機能
+- **アカウント削除**: 一括削除ロジック（Storage 削除未完成）
+- **ユニットテスト**: 一部リポジトリのテスト実装
+- **プロフィールタブ**: 集計ロジックの一部改善
+
+### ❌ 未実装機能
+- **ブロック機能**: リポジトリとルールが未実装
+- **テーマ切り替え UI**: ColorScheme 準備済みだが UI 未完成
+- **アルバム検索**: ユーザー検索のみ対応
+- **Discord Webhook**: エンドポイントのみ存在
+- **通報/モデレーション**: エンドポイントのみ存在
+- **CAPTCHA/レート制限**: パスワードリセットの追加セキュリティ
+- **E2E テスト**: テスト環境未構築
+
+### セキュリティ設計
+Firestore セキュリティルールは、**読み取りを permissive（基本的に true）にしてクライアント側でフィルタリング**する設計です。これにより、ブロック解除後のリアルタイム更新に柔軟に対応できます。**書き込みは厳格にチェック**し、フレンド関係やアルバム可視性を検証します。
+
+### パフォーマンス
+- 無限スクロールによる段階的読み込み
+- 可視範囲のみリアルタイム購読
+- 画像の遅延読み込み
+- Firestore インデックス最適化
+
+今後は、ブロック機能、アルバム検索、テーマ切り替え、通報機能などを段階的に実装予定です。
 
 ---
 
 **作成日:** 2025-01-XX  
-**最終更新:** 2025-01-XX  
-**バージョン:** 1.0
+**最終更新:** 2026-01-02  
+**バージョン:** 1.1
 
