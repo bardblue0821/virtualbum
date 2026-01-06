@@ -11,7 +11,7 @@
 - **画像処理:** react-easy-crop (アバター切り抜き), react-image-crop, lightgallery (ギャラリービューアー)
 - **画像表示:** react-photo-album (レスポンシブグリッド)
 - **テスト:** Jest 29.7, React Testing Library 16.3
-- **その他:** Nodemailer 7.0 (メール送信), Prisma 7.0 (PostgreSQL連携予定), react-intersection-observer (無限スクロール)
+- **その他:** Nodemailer 7.0 (メール送信), react-intersection-observer (無限スクロール)
 
 ---
 
@@ -20,11 +20,19 @@
 ### ルートディレクトリ
 
 ```
-instavram3/
+virtualbum/
 ├── app/              # Next.js App Router のページとレイアウト
 ├── components/       # React コンポーネント（UI/機能別）
 ├── lib/              # ビジネスロジック、repositories、Firebase 初期化
+│   ├── server/       # サーバーサイド専用ユーティリティ（Admin SDK、API ヘルパー）
+│   ├── errors/       # エラーハンドリング統一モジュール
+│   ├── repos/        # Firestore リポジトリ層
+│   ├── hooks/        # カスタム React Hooks
+│   └── services/     # ビジネスロジックサービス
 ├── src/              # サービス層（タイムライン集約、プロフィールサービス等）
+├── types/            # 共通型定義（models.ts 等）
+├── test/             # テストファイル
+│   └── __mocks__/    # Firebase モック共通化
 ├── public/           # 静的ファイル（画像、favicon 等）
 ├── firestore.rules   # Firestore セキュリティルール
 ├── package.json      # npm 依存関係
@@ -188,14 +196,32 @@ lightgallery を使ったフルスクリーン画像ビューアー（スワイ�
 
 #### `components/timeline/` - タイムライン UI
 
-##### `components/timeline/TimelineItem.tsx` (715 lines)
-タイムライン 1 行の UI。リポストバナー、画像追加バナー、オーナー表示、画像グリッド、コメントプレビュー、いいね/コメント/リポスト/リアクションボタンを含みます。
+##### `components/timeline/TimelineItem.tsx` (250 lines)
+タイムライン 1 行のメインコンポーネント。サブコンポーネントを組み合わせて構成します。
 
-##### `components/timeline/ReactionSummary.tsx`
-リアクション集計表示。絵文字別カウントとマイリアクションのハイライトを提供します。
+##### `components/timeline/types.ts` (80 lines)
+共通型定義（Img, UserRef, TimelineItemProps, ReactionData 等）。
 
-##### `components/timeline/ReactionPickerPopover.tsx`
-リアクション絵文字ピッカー。カテゴリ別絵文字一覧をポップオーバーで表示します。
+##### `components/timeline/utils.ts` (40 lines)
+ユーティリティ関数（toDate, formatDateTime, truncateText）。
+
+##### `components/timeline/ImageGrid.tsx` (130 lines)
+1〜4枚の画像を最適なレイアウトで表示するグリッドコンポーネント。
+
+##### `components/timeline/ActionBar.tsx` (200 lines)
+いいね/リポスト/コメントボタンのアクションバー。ホバー時にユーザー一覧をポップオーバー表示。
+
+##### `components/timeline/ReactionSection.tsx` (335 lines)
+リアクションチップと絵文字ピッカー。カテゴリ別絵文字選択、リアクター表示に対応。
+
+##### `components/timeline/CommentPreview.tsx` (65 lines)
+最新コメント3件のプレビュー表示。
+
+##### `components/timeline/UserListPopover.tsx` (85 lines)
+いいね/リポスト/リアクションのユーザー一覧ポップオーバー（共通コンポーネント）。
+
+##### `components/timeline/index.ts` (10 lines)
+サブコンポーネントの統一エクスポート。
 
 #### `components/ui/` - 汎用 UI コンポーネント
 
@@ -246,11 +272,36 @@ lightgallery を使ったフルスクリーン画像ビューアー（スワイ�
 #### `lib/firebase.ts`
 Firebase アプリ初期化と db, auth, storage のエクスポート。環境変数から設定を読み込みます。
 
-#### `lib/firebaseAdmin.ts`
-Firebase Admin SDK 初期化。サーバーサイド API routes で使用します。
+#### `lib/logger.ts`
+環境に応じたロガーユーティリティ。production では error のみ、development では全て出力。`createLogger(prefix)` で名前付きロガーを作成できます。
 
 #### `lib/paths.ts`
 Firestore コレクション名を定数として集中管理（`COL.users`, `COL.albums` など）。
+
+#### `lib/errors.ts`
+エラーメッセージの翻訳関数。Firebase Auth エラーコードや Firestore エラーを日本語メッセージに変換。
+
+#### `lib/errors/` - エラーハンドリング統一モジュール
+
+##### `lib/errors/index.ts`
+エラーハンドリングの統一エクスポート（AppError, translateFirebaseError, handleError, ErrorHelpers）。
+
+##### `lib/errors/ErrorHandler.ts`
+構造化されたエラーハンドリング。カスタムエラークラス `AppError` と Toast 連携。
+
+#### `lib/server/` - サーバーサイド専用ユーティリティ
+
+##### `lib/server/firebaseAdmin.ts`
+Firebase Admin SDK の再エクスポート（verifyIdToken, getAdminAuth, getAdminDb）。
+
+##### `lib/server/adminRepo.ts`
+Admin SDK を使用する Firestore リポジトリ関数の再エクスポート。
+
+##### `lib/server/apiHelpers.ts`
+API Route 用ユーティリティ。認証付きハンドラー `withAuth`、レスポンスヘルパー `ApiResponse`、レート制限 `checkRateLimit` を提供。
+
+##### `lib/server/index.ts`
+サーバーサイドユーティリティの統一エクスポート。
 
 #### `lib/constants/` - 定数定義
 
@@ -312,18 +363,55 @@ Firestore コレクション名を定数として集中管理（`COL.users`, `CO
 ##### `lib/services/sendVerificationDev.ts`
 メール確認リンク送信サービス（開発用）。Nodemailer でメール送信を予定しています（実装中）。
 
+#### `lib/hooks/` - カスタム React Hooks
+
+##### `lib/hooks/useAuthUser.ts`
+Firebase Auth のユーザー状態を管理するフック。
+
+##### `lib/hooks/useFriendship.ts`
+フレンド関係の取得・操作を行うフック。
+
+##### `lib/hooks/useWatch.ts`
+ウォッチ（フォロー）関係の取得・操作を行うフック。
+
+##### `lib/hooks/useAlbumDetail.ts`
+アルバム詳細データの取得を行うフック。
+
+##### `lib/hooks/useNotificationsBadge.ts`
+未読通知数のバッジ表示用フック。
+
+##### `lib/hooks/useTimelineItemVisibility.ts`
+タイムラインアイテムの可視性を検出するフック（IntersectionObserver 使用）。
+
+##### `lib/hooks/useVerificationGuard.ts`
+メール確認済みかをチェックするガードフック。
+
+##### `lib/hooks/useAsyncOperation.ts`
+非同期操作の loading/error 状態を管理する汎用フック。
+
 ---
 
 ### `src/` - アプリケーション層サービス
 
-#### `src/services/timeline/listLatestAlbums.ts` (244 lines)
-**タイムライン集約サービス**。自分、フレンド、ウォッチ中ユーザーの最新アルバムを取得し、画像、コメントプレビュー、いいね、リポスト、リアクションを集約して TimelineItemVM を生成します。権限エラー発生時のフォールバックロジックも実装されています。
+#### `src/services/timeline/listLatestAlbums.ts` (290 lines)
+**タイムライン集約サービス**。自分、フレンド、ウォッチ中ユーザーの最新アルバムを取得し、画像、コメントプレビュー、いいね、リポスト、リアクションを集約して TimelineItemVM を生成します。ユーザー情報のバッチ取得による N+1 問題の最適化、権限エラー発生時のフォールバックロジックを実装しています。環境対応ロガー (`createLogger`) を使用。
 
-#### `src/services/profile/`
-プロフィール画面用のサービス（アルバム取得、フレンド数集計等）を配置予定。
+#### `src/services/profile/buildPatch.ts`
+プロフィール編集時のパッチデータを構築するサービス。
 
-#### `src/services/album/`
-アルバム詳細画面用のサービス（参加ユーザー集計、画像メタ情報取得等）を配置予定。
+#### `src/hooks/` - カスタム React Hooks
+
+##### `src/hooks/useAlbumAccess.ts`
+アルバムへのアクセス権限をチェックするフック。
+
+##### `src/hooks/useThumbBackfill.ts`
+サムネイル画像のバックフィル処理を行うフック。
+
+#### `src/repositories/admin/firestore.ts`
+Admin SDK を使用する Firestore 操作関数（adminAddImage, adminDeleteImage, adminToggleLike 等）。
+
+#### `src/libs/firebaseAdmin.ts`
+Firebase Admin SDK 初期化と認証・DB アクセス関数。環境対応ロガーを使用。
 
 #### `src/models/`
 アプリケーション層のビューモデル定義（TimelineItemVM, UserRef 等）。
