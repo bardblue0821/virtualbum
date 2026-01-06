@@ -34,17 +34,7 @@
           // https://firebase.google.com/docs/web/setup#available-libraries
 
           // Your web app's Firebase configuration
-          // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-                    const firebaseConfig = {
-                        apiKey: "AIzaSyDpx2YhHDQbjn2FG0LkWAeVVjO4Uqf8RH0",
-                        authDomain: "instavram3.firebaseapp.com",
-                        projectId: "instavram3",
-                        // 修正: storageBucket は <projectId>.appspot.com 形式
-                        storageBucket: "instavram3.appspot.com",
-                        messagingSenderId: "244098860504",
-                        appId: "1:244098860504:web:c0edf72e7e1cedd092dead",
-                        measurementId: "G-6D5ZV5JK4E"
-                    };
+
 
           // Initialize Firebase
           const app = initializeApp(firebaseConfig);
