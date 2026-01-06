@@ -2,26 +2,10 @@ import { db } from '../firebase'
 import { doc, getDoc, setDoc, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore'
 import { COL } from '../paths'
 import { checkRateLimit } from '../rateLimit'
+import type { UserDoc } from '@/types/models'
 
-// 拡張ユーザー型 (後方互換: 既存ドキュメントに無いフィールドは undefined/null 扱い)
-export interface UserDoc {
-  uid: string;
-  displayName: string;
-  handle: string | null;
-  iconURL?: string | null;
-  iconFullURL?: string | null;
-  iconUpdatedAt?: Date | null;
-  bio?: string | null;            // 最大500文字 (保存時サニタイズ)
-  vrchatUrl?: string | null;      // VRChat関連URL 1件 (http/https, "vrchat" を含む簡易チェック推奨)
-  links?: string[];               // その他URL 最大3件 (http/https)
-  language?: string | null;       // 言語コード/名称
-  gender?: string | null;         // 'male' | 'female' | 'other' | 'unspecified' 等
-  age?: number | null;            // 0〜150 (任意 / birthDate からの自動算出は後工程)
-  location?: string | null;       // 住んでいる場所 (自由入力)
-  birthDate?: string | null;      // YYYY-MM-DD 形式 (表示用)
-  createdAt?: Date;               // 初期作成時
-  updatedAt?: Date;               // updateUser 実行時設定
-}
+// 型を再エクスポート（後方互換）
+export type { UserDoc } from '@/types/models';
 
 export async function getUser(uid: string): Promise<UserDoc | null> {
   const snap = await getDoc(doc(db, COL.users, uid))

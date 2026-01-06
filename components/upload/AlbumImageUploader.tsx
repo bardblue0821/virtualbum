@@ -325,6 +325,14 @@ export default function AlbumImageUploader({
                 let data: any = {};
                 const text = await res.text();
                 console.log('[AlbumImageUploader] API response text:', text);
+                console.error('[AlbumImageUploader] API error details:', {
+                  status: res.status,
+                  statusText: res.statusText,
+                  responseText: text,
+                  albumId,
+                  userId,
+                  userUid: user?.uid
+                });
                 try {
                   data = JSON.parse(text);
                 } catch (e) {

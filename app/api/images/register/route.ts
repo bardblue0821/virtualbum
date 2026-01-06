@@ -2,10 +2,12 @@ export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { canUploadMoreImages } from '@/lib/repos/imageRepo';
-import { adminAddImage } from '@/src/repositories/admin/firestore';
+import { adminAddImage, adminGetFriendStatus } from '@/src/repositories/admin/firestore';
 import { getAlbumSafe } from '@/lib/repos/albumRepo';
-import { getFriendStatus } from '@/lib/repos/friendRepo';
 import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('api:images:register');
 
 // simple rate limit per IP: 20 req / 60s (higher than add endpoint due to batch uploads)
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
     if (!rateLimit(`image:register:${ip}`)) {
-      console.warn('[images:register] rate limited:', ip);
+      log.warn('rate limited:', ip);
       return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
     }
     
@@ -41,14 +43,14 @@ export async function POST(req: NextRequest) {
     const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
     if (!token) {
       if (process.env.NODE_ENV !== 'production') {
-        console.warn('images:register no token; allowing in dev');
+        log.warn('no token; allowing in dev');
       } else {
-        console.warn('[images:register] unauthorized: no token');
+        log.warn('unauthorized: no token');
         return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
       }
     }
     const decoded = token ? await verifyIdToken(token) : null;
-    console.log('[images:register] decoded user:', decoded?.uid);
+    log.debug('decoded user:', decoded?.uid);
 
     const json = await req.json().catch(() => null);
     const albumId = json?.albumId as string | undefined;
@@ -56,21 +58,21 @@ export async function POST(req: NextRequest) {
     const url = json?.url as string | undefined;
     const thumbUrl = json?.thumbUrl as string | undefined;
     
-    console.log('[images:register] request:', { albumId, userId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
+    log.debug('request:', { albumId, userId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
     
     if (!albumId || !userId || !url) {
-      console.warn('[images:register] invalid input:', { albumId, userId, hasUrl: !!url });
+      log.warn('invalid input:', { albumId, userId, hasUrl: !!url });
       return NextResponse.json({ error: 'INVALID_INPUT' }, { status: 400 });
     }
     if (decoded && decoded.uid !== userId) {
-      console.warn('[images:register] forbidden: uid mismatch:', { decoded: decoded.uid, userId });
+      log.warn('forbidden: uid mismatch:', { decoded: decoded.uid, userId });
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
     // アルバムの存在と権限をチェック
     const album = await getAlbumSafe(albumId);
     if (!album) {
-      console.warn('[images:register] album not found:', albumId);
+      log.warn('album not found:', albumId);
       return NextResponse.json({ error: 'ALBUM_NOT_FOUND' }, { status: 404 });
     }
     
@@ -78,36 +80,49 @@ export async function POST(req: NextRequest) {
     let isFriend = false;
     try {
       const [forward, backward] = await Promise.all([
-        getFriendStatus(userId, album.ownerId),
-        getFriendStatus(album.ownerId, userId),
+        adminGetFriendStatus(userId, album.ownerId),
+        adminGetFriendStatus(album.ownerId, userId),
       ]);
       isFriend = (forward === 'accepted') || (backward === 'accepted');
     } catch (e) {
-      console.warn('[images:register] friend status check failed:', e);
+      log.warn('friend status check failed:', e);
     }
 
-    console.log('[images:register] permissions:', { isOwner, isFriend, albumOwnerId: album.ownerId });
+    log.debug('permissions:', { 
+      isOwner, 
+      isFriend, 
+      albumOwnerId: album.ownerId,
+      userId,
+      albumVisibility: album.visibility
+    });
 
     if (!(isOwner || isFriend)) {
-      console.warn('[images:register] no permission');
+      log.warn('no permission:', {
+        reason: 'not owner and not friend',
+        isOwner,
+        isFriend,
+        userId,
+        albumOwnerId: album.ownerId
+      });
       return NextResponse.json({ error: 'NO_PERMISSION' }, { status: 403 });
     }
 
     // アップロード上限チェック
     const allow = await canUploadMoreImages(albumId, userId);
     if (!allow) {
-      console.warn('[images:register] limit exceeded');
+      log.warn('limit exceeded');
       return NextResponse.json({ error: 'LIMIT_EXCEEDED' }, { status: 400 });
     }
 
     // Admin SDK で Firestore に登録
-    console.log('[images:register] calling adminAddImage');
+    log.debug('calling adminAddImage');
     await adminAddImage(albumId, userId, url, thumbUrl);
     
-    console.log('[images:register] success');
+    log.debug('success');
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    console.error('[images:register] error:', e);
-    return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'UNKNOWN';
+    log.error('error:', e);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

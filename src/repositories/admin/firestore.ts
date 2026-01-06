@@ -1,19 +1,21 @@
 import { getAdminDb } from '@/src/libs/firebaseAdmin';
 import { COL } from '@/lib/paths';
 import * as admin from 'firebase-admin';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('admin:firestore');
 
 export async function adminAddImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string) {
   try {
     const db = getAdminDb();
-    const data: any = { albumId, uploaderId, url, createdAt: admin.firestore.FieldValue.serverTimestamp() };
+    const data: Record<string, unknown> = { albumId, uploaderId, url, createdAt: admin.firestore.FieldValue.serverTimestamp() };
     if (thumbUrl) data.thumbUrl = thumbUrl;
-    console.log('[adminAddImage] adding image:', { albumId, uploaderId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
+    log.debug('adding image:', { albumId, uploaderId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
     const ref = await db.collection(COL.albumImages).add(data);
-    console.log('[adminAddImage] image added, id:', ref.id);
+    log.debug('image added, id:', ref.id);
     await ref.update({ id: ref.id });
-    console.log('[adminAddImage] success');
   } catch (e) {
-    console.error('[adminAddImage] error:', e);
+    log.error('adminAddImage error:', e);
     throw e;
   }
 }
@@ -85,8 +87,29 @@ export async function adminToggleRepost(albumId: string, userId: string): Promis
         await addNotif({ userId: pid, actorId: userId, type: 'repost', albumId, message: 'あなたが参加しているアルバムがリポストされました' });
       }
     } catch (e) {
-      console.warn('adminToggleRepost: notification failed', e);
+      log.warn('adminToggleRepost: notification failed', e);
     }
     return { added: true };
+  }
+}
+
+/**
+ * Admin SDK を使って友達関係をチェック（セキュリティルールをバイパス）
+ */
+export async function adminGetFriendStatus(userId: string, targetId: string): Promise<'accepted' | 'pending' | 'none'> {
+  try {
+    const db = getAdminDb();
+    const friendId = `${userId}_${targetId}`;
+    const snap = await db.collection(COL.friends).doc(friendId).get();
+    
+    if (!snap.exists) {
+      return 'none';
+    }
+    
+    const data = snap.data() as any;
+    return data?.status === 'accepted' ? 'accepted' : 'pending';
+  } catch (e) {
+    log.error('adminGetFriendStatus error:', e);
+    return 'none';
   }
 }

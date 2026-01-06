@@ -10,16 +10,29 @@ import { listReactionsByAlbum } from "@/lib/repos/reactionRepo";
 import { countReposts, hasReposted, getRepost, listRepostsByAlbumRaw } from "@/lib/repos/repostRepo";
 import { getAlbum } from "@/lib/repos/albumRepo";
 import { batchGetUsers } from "@/lib/utils/batchQuery";
+import { createLogger } from "@/lib/logger";
 
-function toMillis(v: any): number | null {
+const log = createLogger('timeline:listLatestAlbums');
+
+interface FirestoreTimestamp {
+  toDate(): Date;
+  seconds: number;
+}
+
+function toMillis(v: unknown): number | null {
   if (!v) return null;
   if (v instanceof Date) return v.getTime();
-  if (typeof v?.toDate === 'function') return v.toDate().getTime();
-  if (typeof v === 'object' && typeof v.seconds === 'number') return v.seconds * 1000;
+  if (typeof v === 'object' && v !== null && 'toDate' in v && typeof (v as FirestoreTimestamp).toDate === 'function') {
+    return (v as FirestoreTimestamp).toDate().getTime();
+  }
+  if (typeof v === 'object' && v !== null && 'seconds' in v && typeof (v as FirestoreTimestamp).seconds === 'number') {
+    return (v as FirestoreTimestamp).seconds * 1000;
+  }
   if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
   return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toUserRef(u: any | null): UserRef | null {
   if (!u) return null;
   return { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName };
@@ -50,7 +63,7 @@ export async function listLatestAlbumsVMLimited(
     }
     for (const w of watched) ownerSet.add(w);
   } catch (e) {
-    console.warn("friend/watch fetch error", e);
+    log.warn("friend/watch fetch error", e);
   }
 
   const ownerIds = Array.from(ownerSet);
@@ -93,11 +106,11 @@ export async function listLatestAlbumsVMLimited(
         }
         if (best) latestRepostByAlbum.set(album.id, best);
       } catch (e) {
-        console.warn('listRepostsByAlbumRaw error', album.id, e);
+        log.warn('listRepostsByAlbumRaw error', album.id, e);
       }
     }));
   } catch (e) {
-    console.warn('build latestRepostByAlbum failed', e);
+    log.warn('build latestRepostByAlbum failed', e);
   }
 
   // ========================================
@@ -118,7 +131,7 @@ export async function listLatestAlbumsVMLimited(
       }
     });
   } catch (e) {
-    console.warn('batchGetUsers failed', e);
+    log.warn('batchGetUsers failed', e);
   }
 
   // ========================================
@@ -135,7 +148,7 @@ export async function listLatestAlbumsVMLimited(
           owner = toUserRef(u);
           cache.set(album.ownerId, owner);
         } catch (e) {
-          console.warn(`getUser failed for ${album.ownerId}`, e);
+          log.warn(`getUser failed for ${album.ownerId}`, e);
           owner = null;
         }
       }
@@ -171,7 +184,7 @@ export async function listLatestAlbumsVMLimited(
               au = toUserRef(u);
               cache.set(latestImg.uploaderId, au);
             } catch (e) {
-              console.warn(`getUser failed for uploader ${latestImg.uploaderId}`, e);
+              log.warn(`getUser failed for uploader ${latestImg.uploaderId}`, e);
             }
           }
           imageAdded = { userId: latestImg.uploaderId, user: au || undefined, createdAt: latestImg.createdAt || latestImg.updatedAt };
@@ -194,7 +207,7 @@ export async function listLatestAlbumsVMLimited(
             cu = toUserRef(u);
             cache.set(c.userId, cu);
           } catch (e) {
-            console.warn(`getUser failed for comment user ${c.userId}`, e);
+            log.warn(`getUser failed for comment user ${c.userId}`, e);
           }
         }
         return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
@@ -219,7 +232,7 @@ export async function listLatestAlbumsVMLimited(
             ru = toUserRef(u);
             cache.set(lr.userId, ru);
           } catch (e) {
-            console.warn(`getUser failed for reposter ${lr.userId}`, e);
+            log.warn(`getUser failed for reposter ${lr.userId}`, e);
           }
         }
         repostedBy = { userId: lr.userId, user: ru || undefined, createdAt: lr.createdAt };
@@ -234,7 +247,7 @@ export async function listLatestAlbumsVMLimited(
                 ru = toUserRef(u);
                 cache.set(currentUserId, ru);
               } catch (e) {
-                console.warn(`getUser failed for current user`, e);
+                log.warn(`getUser failed for current user`, e);
               }
             }
             repostedBy = { userId: currentUserId, user: ru || undefined, createdAt: mine.createdAt };
