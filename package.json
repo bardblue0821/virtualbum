@@ -11,7 +11,9 @@
     "test:watch": "jest --watch",
     "test:frontend": "jest test/frontend",
     "test:backend": "jest test/backend",
-    "emulator": "firebase emulators:start --only firestore",
+    "test:emulator": "firebase emulators:exec --only auth,firestore,storage \"jest test/integration --runInBand\"",
+    "test:integration": "jest test/integration --runInBand",
+    "emulator": "firebase emulators:start --only auth,firestore,storage",
     "emulator:ui": "firebase emulators:start"
   },
   "dependencies": {
