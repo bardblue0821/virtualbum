@@ -43,8 +43,14 @@ export default function Header() {
       if (!user) { if (active) setUserDoc(null); return; }
       try {
         const doc = await getUser(user.uid);
+        console.log('[Header] ユーザードキュメント取得:', {
+          uid: user.uid,
+          handle: doc?.handle,
+          displayName: doc?.displayName
+        });
         if (active) setUserDoc(doc);
       } catch (e) {
+        console.error('[Header] ユーザードキュメント取得エラー:', e);
         if (active) setUserDoc(null);
       }
     })();
@@ -126,7 +132,7 @@ export default function Header() {
           </svg>
         </button>
         {/* ブランド中央配置 */}
-  <Link href="/" className="font-semibold text-lg link-accent" aria-label="トップへ">instaVRam</Link>
+  <Link href="/" className="font-semibold text-lg link-accent" aria-label="トップへ">Virtualbum</Link>
         {open && (
           <div
             ref={menuRef}
