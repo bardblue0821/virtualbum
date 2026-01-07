@@ -15,6 +15,7 @@ import { useThumbBackfill } from "@/src/hooks/useThumbBackfill";
 import { useAlbumAccess } from "@/src/hooks/useAlbumAccess";
 import { REACTION_CATEGORIES } from "@/lib/constants/reactions";
 import { listImages } from "@/lib/repos/imageRepo";
+import { listAcceptedFriends } from "@/lib/repos/friendRepo";
 
 // 分割したカスタムフック
 import {
@@ -145,6 +146,26 @@ export default function AlbumDetailPage() {
   // 画像管理モーダル
   const [imageManageModalOpen, setImageManageModalOpen] = useState(false);
 
+  // ログインユーザーのフレンドIDセット
+  const [myFriendIds, setMyFriendIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user?.uid) {
+      setMyFriendIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    listAcceptedFriends(user.uid).then((docs) => {
+      if (cancelled) return;
+      const ids = new Set<string>();
+      for (const d of docs) {
+        if (d.userId === user.uid) ids.add(d.targetId);
+        else if (d.targetId === user.uid) ids.add(d.userId);
+      }
+      setMyFriendIds(ids);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
   // サムネイル自動生成
   useThumbBackfill(albumId, images, visibleCount, setImages);
 
@@ -170,6 +191,7 @@ export default function AlbumDetailPage() {
       uploaderId: img.uploaderId,
       uploaderIconURL: img.uploaderId ? (uploaderMap[img.uploaderId]?.iconURL || null) : null,
       uploaderHandle: img.uploaderId ? (uploaderMap[img.uploaderId]?.handle || null) : null,
+      createdAt: img.createdAt,
     }));
   }, [images, uploaderMap]);
 
@@ -227,9 +249,21 @@ export default function AlbumDetailPage() {
                   const icon = uploaderMap[uid!]?.iconURL || null;
                   const handle = uploaderMap[uid!]?.handle || null;
                   const href = `/user/${handle || uid}`;
+                  const isAlbumOwner = uid === album.ownerId;
+                  const isMyFriend = myFriendIds.has(uid as string);
+                  
+                  // 枠の色: フレンドならオレンジ、それ以外はデフォルト
+                  const borderClass = isMyFriend ? "ring-2 ring-friend" : "";
+                  
                   return (
-                    <a key={uid as string} href={href} aria-label="プロフィールへ" className="shrink-0">
-                      <Avatar src={icon || undefined} size={28} interactive={false} withBorder={false} className="rounded-full" />
+                    <a key={uid as string} href={href} aria-label="プロフィールへ" className="shrink-0 relative">
+                      {/* 王冠マーク（オーナーのみ） */}
+                      {isAlbumOwner && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 text-yellow-500 drop-shadow-sm" style={{ fontSize: '14px' }}>
+                          👑
+                        </span>
+                      )}
+                      <Avatar src={icon || undefined} size={28} interactive={false} withBorder={false} className={`rounded-full ${borderClass}`} />
                     </a>
                   );
                 })}

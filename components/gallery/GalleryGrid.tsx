@@ -24,6 +24,7 @@ export type PhotoItem = {
   uploaderId?: string;
   uploaderIconURL?: string | null;
   uploaderHandle?: string | null;
+  createdAt?: any; // Firestore Timestamp or Date or number
 };
 
 function escapeHtml(text: string) {
