@@ -19,7 +19,13 @@
     "seed:small": "npx tsx scripts/seed-emulator.ts small",
     "seed:medium": "npx tsx scripts/seed-emulator.ts medium",
     "seed:large": "npx tsx scripts/seed-emulator.ts large",
-    "seed:reset": "npx tsx scripts/seed-emulator.ts reset"
+    "seed:stress": "npx tsx scripts/seed-emulator.ts stress",
+    "seed:social": "npx tsx scripts/seed-emulator.ts social",
+    "seed:albums": "npx tsx scripts/seed-emulator.ts albums",
+    "seed:fresh": "npx tsx scripts/seed-emulator.ts fresh",
+    "seed:active": "npx tsx scripts/seed-emulator.ts active",
+    "seed:reset": "npx tsx scripts/seed-emulator.ts reset",
+    "seed:list": "npx tsx scripts/seed-patterns.ts"
   },
   "dependencies": {
     "@emotion/react": "^11",

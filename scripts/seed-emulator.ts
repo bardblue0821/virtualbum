@@ -5,14 +5,37 @@
  * Firebase Admin SDK を使用してセキュリティルールをバイパス
  * 
  * 使用方法:
- *   npm run seed:small   - 10ユーザー、20アルバム
- *   npm run seed:medium  - 50ユーザー、150アルバム
- *   npm run seed:large   - 100ユーザー、300アルバム
+ *   npm run seed:small   - 10ユーザー、簡易テスト
+ *   npm run seed:medium  - 50ユーザー、一般テスト
+ *   npm run seed:large   - 200ユーザー、パフォーマンステスト
+ *   npm run seed:stress  - 500ユーザー、負荷テスト
+ *   npm run seed:social  - 100ユーザー、ソーシャル機能重視
+ *   npm run seed:albums  - 30ユーザー、コンテンツ重視
+ *   npm run seed:fresh   - 50ユーザー、新規ユーザー中心
+ *   npm run seed:active  - 30ユーザー、アクティブユーザー中心
  *   npm run seed:reset   - 全データ削除
  */
 
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+
+// パターン定義のインポート
+import {
+  SEED_PATTERNS,
+  type SeedConfig,
+  NAMES,
+  generateAlbumTitle,
+  generateComment,
+  generateReaction,
+  generateBio,
+  generateDisplayName,
+  randomInRange,
+  randomPick,
+  randomPickMultiple,
+  randomPastDate,
+  randomString,
+} from './seed-patterns';
 
 // エミュレータ設定
 process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
@@ -26,189 +49,194 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore();
-
-// シード設定
-interface SeedConfig {
-  userCount: number;
-  albumsPerUser: number;
-  imagesPerAlbum: number;
-  friendConnectionRate: number;
-  watchesPerUser: number;
-  likesPerAlbum: number;
-  commentsPerAlbum: number;
-  reactionsPerAlbum: number;
-}
-
-const CONFIGS: Record<string, SeedConfig> = {
-  small: {
-    userCount: 10,
-    albumsPerUser: 2,
-    imagesPerAlbum: 3,
-    friendConnectionRate: 0.3,
-    watchesPerUser: 3,
-    likesPerAlbum: 3,
-    commentsPerAlbum: 2,
-    reactionsPerAlbum: 2,
-  },
-  medium: {
-    userCount: 50,
-    albumsPerUser: 3,
-    imagesPerAlbum: 5,
-    friendConnectionRate: 0.1,
-    watchesPerUser: 5,
-    likesPerAlbum: 10,
-    commentsPerAlbum: 3,
-    reactionsPerAlbum: 5,
-  },
-  large: {
-    userCount: 100,
-    albumsPerUser: 3,
-    imagesPerAlbum: 5,
-    friendConnectionRate: 0.05,
-    watchesPerUser: 10,
-    likesPerAlbum: 20,
-    commentsPerAlbum: 5,
-    reactionsPerAlbum: 10,
-  },
-};
-
-// ヘルパー関数
-function randomString(length: number = 8): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-function randomPick<T>(array: T[]): T {
-  return array[Math.floor(Math.random() * array.length)];
-}
-
-function randomPickMultiple<T>(array: T[], count: number): T[] {
-  const shuffled = [...array].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(count, array.length));
-}
-
-function randomPastDate(daysAgo: number = 365): Date {
-  const now = Date.now();
-  const past = now - Math.floor(Math.random() * daysAgo * 24 * 60 * 60 * 1000);
-  return new Date(past);
-}
+const auth = getAuth();
 
 // データ生成関数
-function generateUsers(count: number) {
-  const firstNames = ['太郎', '花子', '次郎', '美咲', '健太', '愛子', '翔太', 'さくら', '大輔', '真由'];
-  const lastNames = ['田中', '山田', '佐藤', '鈴木', '高橋', '伊藤', '渡辺', '中村', '小林', '加藤'];
+function generateUsers(count: number, config: SeedConfig) {
+  const users = [];
   
-  return Array.from({ length: count }, (_, i) => {
+  for (let i = 0; i < count; i++) {
     const uid = `user_${String(i).padStart(4, '0')}`;
-    return {
+    const handle = `user_${randomString(6)}`;
+    const displayName = generateDisplayName();
+    const email = `user${i}@test.local`;  // テスト用メールアドレス
+    
+    // 古いアカウントを含める場合のバリエーション
+    let createdDaysAgo = 365;
+    if (config.includeInactiveUsers && Math.random() < 0.2) {
+      createdDaysAgo = randomInRange(365, 730); // 1-2年前
+    }
+    
+    users.push({
       uid,
-      displayName: randomPick(lastNames) + randomPick(firstNames),
-      handle: `user_${randomString(6)}`,
-      bio: `テストユーザー #${i + 1}`,
+      email,
+      displayName,
+      handle,
+      bio: generateBio(i + 1, handle),
       iconURL: `https://picsum.photos/200/200?random=${randomString(6)}`,
-      createdAt: randomPastDate(365),
+      createdAt: randomPastDate(createdDaysAgo),
       updatedAt: new Date(),
-    };
-  });
+    });
+  }
+  
+  return users;
 }
 
-function generateAlbums(userIds: string[], albumsPerUser: number) {
-  const titles = ['VRChat集会', '渋谷オフ会', '誕生日パーティー', 'クリスマスイベント', '新年会', '花見', '夏祭り', '忘年会'];
-  let counter = 0;
+// Firebase Auth にユーザーを作成
+async function createAuthUsers(users: Array<{ uid: string; email: string; displayName: string }>) {
+  const password = 'password123';  // テスト用共通パスワード
   
-  return userIds.flatMap((ownerId) =>
-    Array.from({ length: albumsPerUser }, () => {
+  for (const user of users) {
+    try {
+      await auth.createUser({
+        uid: user.uid,
+        email: user.email,
+        password: password,
+        displayName: user.displayName,
+        emailVerified: true,
+      });
+    } catch (error: unknown) {
+      // ユーザーが既に存在する場合は無視
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/uid-already-exists') {
+        continue;
+      }
+      throw error;
+    }
+  }
+  console.log(`  Auth users created: ${users.length}`);
+  console.log(`  📧 Login: user0@test.local 〜 user${users.length - 1}@test.local`);
+  console.log(`  🔑 Password: ${password}`);
+}
+
+function generateAlbums(users: { uid: string }[], config: SeedConfig) {
+  let counter = 0;
+  const albums = [];
+  
+  for (const user of users) {
+    // 空のユーザーを含める場合
+    let albumCount = randomInRange(config.albumsPerUser.min, config.albumsPerUser.max);
+    if (config.includeEmptyUsers && Math.random() < 0.1) {
+      albumCount = 0; // 10%のユーザーは投稿なし
+    }
+    
+    // ヘビーユーザーを含める場合
+    if (config.includeHeavyUsers && Math.random() < 0.05) {
+      albumCount = randomInRange(config.albumsPerUser.max * 2, config.albumsPerUser.max * 4);
+    }
+    
+    for (let i = 0; i < albumCount; i++) {
       const id = `album_${String(counter++).padStart(4, '0')}`;
       const createdAt = randomPastDate(180);
-      return {
+      const isPublic = Math.random() < config.publicAlbumRate;
+      
+      albums.push({
         id,
-        ownerId,
-        title: `${randomPick(titles)} ${randomString(4)}`,
-        visibility: randomPick(['public', 'friends'] as const),
+        ownerId: user.uid,
+        title: generateAlbumTitle(),
+        visibility: isPublic ? 'public' : 'friends',
         createdAt,
         updatedAt: createdAt,
-      };
-    })
-  );
+      });
+    }
+  }
+  
+  return albums;
 }
 
-function generateImages(albums: { id: string; ownerId: string }[], imagesPerAlbum: number) {
+function generateImages(albums: { id: string; ownerId: string }[], config: SeedConfig) {
   let counter = 0;
+  const images = [];
   
-  return albums.flatMap((album) =>
-    Array.from({ length: imagesPerAlbum }, () => {
+  for (const album of albums) {
+    const imageCount = randomInRange(config.imagesPerAlbum.min, config.imagesPerAlbum.max);
+    
+    for (let i = 0; i < imageCount; i++) {
       const id = `image_${String(counter++).padStart(5, '0')}`;
-      return {
+      images.push({
         id,
         albumId: album.id,
         uploaderId: album.ownerId,
         url: `https://picsum.photos/1920/1080?random=${randomString(8)}`,
         thumbUrl: `https://picsum.photos/400/300?random=${randomString(8)}`,
         createdAt: randomPastDate(90),
-      };
-    })
-  );
+      });
+    }
+  }
+  
+  return images;
 }
 
-function generateComments(albumIds: string[], userIds: string[], commentsPerAlbum: number) {
-  const bodies = ['すごい！', 'いい写真！', 'また参加したい', '楽しそう！', 'ナイスショット！', '最高！'];
+function generateComments(albumIds: string[], userIds: string[], config: SeedConfig) {
   let counter = 0;
+  const comments = [];
   
-  return albumIds.flatMap((albumId) => {
-    const commenters = randomPickMultiple(userIds, commentsPerAlbum);
-    return commenters.map((userId) => ({
-      id: `comment_${String(counter++).padStart(5, '0')}`,
-      albumId,
-      userId,
-      body: randomPick(bodies),
-      createdAt: randomPastDate(30),
-    }));
-  });
+  for (const albumId of albumIds) {
+    const commentCount = randomInRange(config.commentsPerAlbum.min, config.commentsPerAlbum.max);
+    const commenters = randomPickMultiple(userIds, commentCount);
+    
+    for (const userId of commenters) {
+      comments.push({
+        id: `comment_${String(counter++).padStart(5, '0')}`,
+        albumId,
+        userId,
+        body: generateComment(),
+        createdAt: randomPastDate(30),
+      });
+    }
+  }
+  
+  return comments;
 }
 
-function generateLikes(albumIds: string[], userIds: string[], likesPerAlbum: number) {
+function generateLikes(albumIds: string[], userIds: string[], config: SeedConfig) {
   let counter = 0;
+  const likes = [];
   
-  return albumIds.flatMap((albumId) => {
-    const likers = randomPickMultiple(userIds, likesPerAlbum);
-    return likers.map((userId) => ({
-      id: `like_${String(counter++).padStart(5, '0')}`,
-      albumId,
-      userId,
-      createdAt: randomPastDate(30),
-    }));
-  });
+  for (const albumId of albumIds) {
+    const likeCount = randomInRange(config.likesPerAlbum.min, config.likesPerAlbum.max);
+    const likers = randomPickMultiple(userIds, likeCount);
+    
+    for (const userId of likers) {
+      likes.push({
+        id: `like_${String(counter++).padStart(5, '0')}`,
+        albumId,
+        userId,
+        createdAt: randomPastDate(30),
+      });
+    }
+  }
+  
+  return likes;
 }
 
-function generateReactions(albumIds: string[], userIds: string[], reactionsPerAlbum: number) {
-  const emojis = ['❤️', '👍', '😊', '🎉', '🔥', '✨', '💯', '🙌'];
-  let counter = 0;
+function generateReactions(albumIds: string[], userIds: string[], config: SeedConfig) {
+  const reactions = [];
   
-  return albumIds.flatMap((albumId) => {
-    const reactors = randomPickMultiple(userIds, reactionsPerAlbum);
-    return reactors.map((userId) => {
-      const emoji = randomPick(emojis);
-      return {
+  for (const albumId of albumIds) {
+    const reactionCount = randomInRange(config.reactionsPerAlbum.min, config.reactionsPerAlbum.max);
+    const reactors = randomPickMultiple(userIds, reactionCount);
+    
+    for (const userId of reactors) {
+      const emoji = generateReaction();
+      reactions.push({
         id: `${albumId}:${userId}:${emoji}`,
         albumId,
         userId,
         emoji,
         createdAt: randomPastDate(30),
-      };
-    });
-  });
+      });
+    }
+  }
+  
+  return reactions;
 }
 
-function generateFriends(userIds: string[], connectionRate: number) {
+function generateFriends(userIds: string[], config: SeedConfig) {
   const friends: Array<{ id: string; userId: string; targetId: string; status: string; createdAt: Date }> = [];
   
   for (let i = 0; i < userIds.length; i++) {
     for (let j = i + 1; j < userIds.length; j++) {
-      if (Math.random() < connectionRate) {
+      if (Math.random() < config.friendConnectionRate) {
         const createdAt = randomPastDate(180);
         friends.push(
           { id: `friend_${userIds[i]}_${userIds[j]}`, userId: userIds[i], targetId: userIds[j], status: 'accepted', createdAt },
@@ -220,18 +248,25 @@ function generateFriends(userIds: string[], connectionRate: number) {
   return friends;
 }
 
-function generateWatches(userIds: string[], watchesPerUser: number) {
+function generateWatches(userIds: string[], config: SeedConfig) {
   let counter = 0;
+  const watches = [];
   
-  return userIds.flatMap((userId) => {
-    const targets = randomPickMultiple(userIds.filter((id) => id !== userId), watchesPerUser);
-    return targets.map((ownerId) => ({
-      id: `watch_${String(counter++).padStart(5, '0')}`,
-      userId,
-      ownerId,
-      createdAt: randomPastDate(90),
-    }));
-  });
+  for (const userId of userIds) {
+    const watchCount = randomInRange(config.watchesPerUser.min, config.watchesPerUser.max);
+    const targets = randomPickMultiple(userIds.filter((id) => id !== userId), watchCount);
+    
+    for (const ownerId of targets) {
+      watches.push({
+        id: `watch_${String(counter++).padStart(5, '0')}`,
+        userId,
+        ownerId,
+        createdAt: randomPastDate(90),
+      });
+    }
+  }
+  
+  return watches;
 }
 
 // バッチ書き込み (Admin SDK)
@@ -261,56 +296,64 @@ async function clearCollection(collectionPath: string) {
 
 // メイン処理
 async function seed(configName: string) {
-  const config = CONFIGS[configName];
+  const config = SEED_PATTERNS[configName];
   if (!config) {
     console.error(`Unknown config: ${configName}`);
-    console.log('Available: small, medium, large');
+    console.log('Available patterns:', Object.keys(SEED_PATTERNS).join(', '));
     process.exit(1);
   }
 
   console.log(`\n🌱 Seeding with "${configName}" config...`);
-  console.log(config);
+  console.log(`   Users: ${config.userCount}`);
+  console.log(`   Albums per user: ${config.albumsPerUser.min}-${config.albumsPerUser.max}`);
+  console.log(`   Images per album: ${config.imagesPerAlbum.min}-${config.imagesPerAlbum.max}`);
+  console.log(`   Friend connection rate: ${(config.friendConnectionRate * 100).toFixed(0)}%`);
   console.log('');
 
   // ユーザー生成
-  const users = generateUsers(config.userCount);
+  const users = generateUsers(config.userCount, config);
   console.log(`📝 Generated ${users.length} users`);
+  
+  // Firebase Auth にユーザーを作成
+  await createAuthUsers(users);
+  
+  // Firestore にユーザードキュメントを作成
   await batchWrite('users', users.map((u) => ({ ...u, id: u.uid })));
 
   // アルバム生成
-  const userIds = users.map((u) => u.uid);
-  const albums = generateAlbums(userIds, config.albumsPerUser);
+  const albums = generateAlbums(users, config);
   console.log(`📝 Generated ${albums.length} albums`);
   await batchWrite('albums', albums.map(({ id, ...data }) => ({ id, ...data })));
 
   // 画像生成
-  const images = generateImages(albums.map((a) => ({ id: a.id, ownerId: a.ownerId })), config.imagesPerAlbum);
+  const images = generateImages(albums.map((a) => ({ id: a.id, ownerId: a.ownerId })), config);
   console.log(`📝 Generated ${images.length} images`);
   await batchWrite('albumImages', images.map(({ id, ...data }) => ({ id, ...data })));
 
   // フレンド生成
-  const friends = generateFriends(userIds, config.friendConnectionRate);
+  const userIds = users.map((u) => u.uid);
+  const friends = generateFriends(userIds, config);
   console.log(`📝 Generated ${friends.length} friends`);
   await batchWrite('friends', friends.map(({ id, ...data }) => ({ id, ...data })));
 
   // ウォッチ生成
-  const watches = generateWatches(userIds, config.watchesPerUser);
+  const watches = generateWatches(userIds, config);
   console.log(`📝 Generated ${watches.length} watches`);
   await batchWrite('watches', watches.map(({ id, ...data }) => ({ id, ...data })));
 
   // コメント生成
   const albumIds = albums.map((a) => a.id);
-  const comments = generateComments(albumIds, userIds, config.commentsPerAlbum);
+  const comments = generateComments(albumIds, userIds, config);
   console.log(`📝 Generated ${comments.length} comments`);
   await batchWrite('comments', comments.map(({ id, ...data }) => ({ id, ...data })));
 
   // いいね生成
-  const likes = generateLikes(albumIds, userIds, config.likesPerAlbum);
+  const likes = generateLikes(albumIds, userIds, config);
   console.log(`📝 Generated ${likes.length} likes`);
   await batchWrite('likes', likes.map(({ id, ...data }) => ({ id, ...data })));
 
   // リアクション生成
-  const reactions = generateReactions(albumIds, userIds, config.reactionsPerAlbum);
+  const reactions = generateReactions(albumIds, userIds, config);
   console.log(`📝 Generated ${reactions.length} reactions`);
   await batchWrite('reactions', reactions.map(({ id, ...data }) => ({ id, ...data })));
 
@@ -328,6 +371,21 @@ async function seed(configName: string) {
 async function reset() {
   console.log('\n🗑️ Clearing all data...');
   
+  // Firebase Auth ユーザーを削除
+  try {
+    const listResult = await auth.listUsers(1000);
+    if (listResult.users.length > 0) {
+      const uids = listResult.users.map(u => u.uid);
+      await auth.deleteUsers(uids);
+      console.log(`  Cleared Auth users: ${uids.length}`);
+    } else {
+      console.log(`  Auth users: 0`);
+    }
+  } catch (e) {
+    console.log(`  Auth users: (error)`);
+  }
+  
+  // Firestore コレクションを削除
   const collections = ['users', 'albums', 'albumImages', 'friends', 'watches', 'comments', 'likes', 'reactions', 'reposts', 'notifications'];
   
   for (const col of collections) {
