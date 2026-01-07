@@ -58,6 +58,9 @@ export default function ImageManageModal({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // ドラッグ&ドロップ
+  const [isDragging, setIsDragging] = useState(false);
 
   // 計算
   const myExistingCount = existingImages.length;
@@ -77,12 +80,12 @@ export default function ImageManageModal({
     }
   }, [open]);
 
-  // ファイル選択処理
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // ファイル追加処理（共通）
+  const addFiles = (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
-    const allowCount = Math.min(remaining, files.length);
+    const allowCount = Math.min(remaining, fileArray.length);
     if (allowCount === 0) {
       toast.error("これ以上追加できません（上限4枚）");
       return;
@@ -90,7 +93,12 @@ export default function ImageManageModal({
 
     const accepted: NewImage[] = [];
     for (let i = 0; i < allowCount; i++) {
-      const file = files[i];
+      const file = fileArray[i];
+      // 画像ファイルのみ許可
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name}: 画像ファイルのみ対応しています`);
+        continue;
+      }
       if (file.size > 5 * 1024 * 1024) {
         toast.error(`${file.name}: サイズ上限 5MB を超えています`);
         continue;
@@ -99,15 +107,47 @@ export default function ImageManageModal({
       accepted.push({ file, previewUrl });
     }
 
-    if (files.length > allowCount) {
-      toast.warning(`${files.length - allowCount} 件は上限のためスキップされました`);
+    if (fileArray.length > allowCount) {
+      toast.warning(`${fileArray.length - allowCount} 件は上限のためスキップされました`);
     }
 
     setNewImages((prev) => [...prev, ...accepted]);
+  };
 
+  // ファイル選択処理（input経由）
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    addFiles(files);
     // ファイル入力をリセット
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  // ドラッグ&ドロップ処理
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!uploading && remaining > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (uploading || remaining <= 0) return;
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      addFiles(files);
     }
   };
 
@@ -318,7 +358,7 @@ export default function ImageManageModal({
   for (let i = 0; i < newCount; i++) {
     const img = newImages[i];
     cells.push(
-      <div key={`new-${i}`} className="relative aspect-square rounded-lg overflow-hidden border-2 border-blue-400">
+      <div key={`new-${i}`} className="relative aspect-square rounded-lg overflow-hidden border-2 border-line surface-alt">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={img.croppedPreviewUrl ?? img.previewUrl}
@@ -335,7 +375,7 @@ export default function ImageManageModal({
         >
           ×
         </button>
-        <span className="absolute bottom-1 left-1 text-xs bg-blue-500 text-white px-1 rounded">
+        <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-2 py-0.5 rounded">
           クリックで切抜
         </span>
       </div>
@@ -357,7 +397,7 @@ export default function ImageManageModal({
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-        <span className="text-xs text-gray-500">選択</span>
+        <span className="text-xs text-gray-500 text-center">クリック/<br/>ドロップ</span>
       </button>
     );
   }
@@ -387,8 +427,25 @@ export default function ImageManageModal({
           {/* タイトル */}
           <h2 className="text-lg font-semibold mb-4">画像を管理</h2>
 
-          {/* 2×2 グリッド */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          {/* 2×2 グリッド - ドラッグ&ドロップ対応 */}
+          <div
+            className={`relative grid grid-cols-2 gap-2 mb-4 p-2 rounded-lg transition-colors ${
+              isDragging
+                ? 'border-2 border-dashed border-[var(--accent)] bg-[var(--accent)]/10'
+                : 'border-2 border-transparent'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {/* ドラッグ中のオーバーレイ */}
+            {isDragging && remaining > 0 && (
+              <div className="col-span-2 absolute inset-0 flex items-center justify-center pointer-events-none z-20 rounded-lg bg-[var(--accent)]/20">
+                <div className="bg-[var(--accent)] text-white px-4 py-2 rounded-lg font-medium shadow-lg">
+                  ここにドロップ
+                </div>
+              </div>
+            )}
             {cells}
           </div>
 
