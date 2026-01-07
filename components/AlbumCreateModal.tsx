@@ -262,7 +262,6 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           <p className="text-xs text-gray-500 text-right">{comment.length}/200</p>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">公開範囲</label>
           <div className="flex items-center gap-3 text-sm">
             <label className="inline-flex items-center gap-2">
               <input
@@ -273,7 +272,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
                 onChange={() => setVisibility('public')}
                 disabled={loading || !user}
               />
-              <span>公開（全員に表示）</span>
+              <span>公開</span>
             </label>
             <label className="inline-flex items-center gap-2">
               <input
@@ -292,7 +291,6 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           </p>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2" aria-label="画像選択">画像 (最大4枚)</label>
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
