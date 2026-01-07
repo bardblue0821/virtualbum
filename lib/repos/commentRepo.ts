@@ -18,7 +18,7 @@ export async function addComment(albumId: string, userId: string, body: string) 
     const ownerId = (albumSnap.data() as any)?.ownerId
     if (ownerId && ownerId !== userId) {
       const { addNotification } = await import('./notificationRepo')
-      await addNotification({ userId: ownerId, actorId: userId, type: 'comment', albumId, commentId: ref.id })
+      await addNotification({ userId: ownerId, actorId: userId, type: 'comment', albumId, commentId: ref.id, commentBody: body })
     }
   } catch (e) { /* 通知失敗は致命的でない */ }
 }

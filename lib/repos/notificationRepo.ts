@@ -14,6 +14,7 @@ export interface NotificationInput {
   friendRequestId?: string
   watchId?: string
   message?: string        // 渡されなければ自動生成
+  commentBody?: string    // コメント本文（comment タイプの場合）
 }
 
 function buildMessage(p: NotificationInput): string {

@@ -22,6 +22,21 @@ interface NotificationRow {
   commentId?: string;
   imageId?: string;
   friendRequestId?: string;
+  commentBody?: string; // コメント本文
+}
+
+// 通知タイプごとの絵文字
+function getNotificationEmoji(type: string): string {
+  switch (type) {
+    case 'reaction': return '😊';
+    case 'repost': return '🔁';
+    case 'like': return '❤️';
+    case 'image_added': return '🖼️';
+    case 'friend_request': return '👋';
+    case 'watch': return '👀';
+    case 'comment': return '💬';
+    default: return '🔔';
+  }
 }
 
 export default function NotificationsPage(){
@@ -127,7 +142,7 @@ export default function NotificationsPage(){
   {loading && <p className="text-sm fg-subtle">読み込み中...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
   {!loading && rows.length === 0 && <p className="text-sm fg-subtle">通知はありません。</p>}
-      <ul className="divide-y divide-base">
+      <ul className="divide-y divide-line">
         {rows.map(r => {
           const isUnread = !r.readAt;
           const actor = actors[r.actorId];
@@ -139,8 +154,8 @@ export default function NotificationsPage(){
           return (
             <li key={r.id} className={`py-3 text-sm ${isUnread ? 'surface-alt' : ''}`}>
               <div className="flex flex-col items-start gap-2">
-                {/* 誰が: アイコンを上に表示 */}
-                <div>
+                {/* 誰が: アイコン + 通知種類の絵文字 */}
+                <div className="flex items-center gap-2">
                   <Link href={`/user/${actor?.handle || r.actorId}`} className="block" aria-label="プロフィールへ">
                     {actor?.iconURL ? (
                       <div className="relative h-12 w-12 rounded-md overflow-hidden flex-shrink-0">
@@ -166,6 +181,7 @@ export default function NotificationsPage(){
                       </span>
                     )}
                   </Link>
+                  <span className="text-xl" aria-label={r.type}>{getNotificationEmoji(r.type)}</span>
                 </div>
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="space-y-1">
@@ -177,6 +193,10 @@ export default function NotificationsPage(){
                     ) : (
                       <p><span className="font-medium">{actorName}</span>{actionText}</p>
                     )}
+                  {/* コメント本文を表示 */}
+                  {r.type === 'comment' && r.commentBody && (
+                    <p className="text-sm text-muted mt-1">「{r.commentBody}」</p>
+                  )}
                   {r.type === 'friend_request' && (
                     <div className="text-xs fg-muted flex flex-wrap items-center gap-2">
                       {canActOnFriend && (
@@ -197,12 +217,8 @@ export default function NotificationsPage(){
                       {fState === 'none' && <span className="fg-subtle">状態: 不明</span>}
                     </div>
                   )}
-                  {r.albumId && targetHref?.startsWith('/album/') && (
-                    <Link href={targetHref} className="text-xs link-accent">アルバムを見る</Link>
-                  )}
-                  <p className="text-[11px] fg-subtle">{formatDate(r.createdAt)}</p>
+                  <p className="text-[11px] text-muted">{formatDate(r.createdAt)}</p>
                   </div>
-                  <span className="text-[10px] uppercase tracking-wide fg-subtle">{r.type}</span>
                 </div>
               </div>
             </li>
