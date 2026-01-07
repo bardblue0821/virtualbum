@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Group, Button, Progress, Text, Stack, Paper, Image as MantineImage } from "@mantine/core";
+import { Group, Progress, Text, Stack, Paper, Image as MantineImage } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
+import { Button } from "../ui/Button";
 import { useToast } from "../ui/Toast";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -432,7 +433,7 @@ export default function AlbumImageUploader({
                 <Text size="xs" c="dimmed">
                   選択中: {items.length} / {Math.max(0, remaining)}
                 </Text>
-                <Button variant="default" size="xs" onClick={clearSelection} disabled={busy}>
+                <Button variant="ghost" size="xs" onClick={clearSelection} disabled={busy}>
                   すべて外す
                 </Button>
               </Group>
@@ -495,16 +496,14 @@ export default function AlbumImageUploader({
                 ))}
               </div>
 
-              <Group justify="space-between" align="center">
-                <Text size="sm" c="dimmed">
-                  全体進捗
-                </Text>
-                <div style={{ minWidth: 220 }}>
-                  <Progress value={overall} color="teal" animated={busy} />
-                </div>
-              </Group>
               <Group justify="end">
-                <Button size="sm" color="teal" onClick={handleUploadAll} loading={busy} disabled={items.length === 0 || remaining <= 0}>
+                <Button 
+                  variant="accent" 
+                  size="sm" 
+                  onClick={handleUploadAll} 
+                  isLoading={busy} 
+                  disabled={items.length === 0 || remaining <= 0}
+                >
                   まとめてアップロード
                 </Button>
               </Group>

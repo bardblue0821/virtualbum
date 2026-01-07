@@ -7,6 +7,7 @@ import ReactionsBar from "@/components/album/ReactionsBar";
 import GallerySection from "@/components/album/GallerySection";
 import CommentsSection from "@/components/album/CommentsSection";
 import DeleteConfirmModal from "@/components/album/DeleteConfirmModal";
+import ImageManageModal from "@/components/album/ImageManageModal";
 import Avatar from "@/components/profile/Avatar";
 import { useAuthUser } from "@/src/hooks/useAuthUser";
 import { useToast } from "@/components/ui/Toast";
@@ -141,6 +142,9 @@ export default function AlbumDetailPage() {
   // 表示件数
   const [visibleCount, setVisibleCount] = useState(16);
 
+  // 画像管理モーダル
+  const [imageManageModalOpen, setImageManageModalOpen] = useState(false);
+
   // サムネイル自動生成
   useThumbBackfill(albumId, images, visibleCount, setImages);
 
@@ -270,18 +274,8 @@ export default function AlbumDetailPage() {
         }}
         onDelete={(p) => { if (p.id) askDeleteImage(p.id); }}
         showUploader={!!(user && canAddImages)}
-        albumId={albumId!}
-        userId={user?.uid || ''}
         remaining={remaining}
-        onUploaded={async () => {
-          const imgs = await listImages(albumId!);
-          imgs.sort(
-            (a: any, b: any) =>
-              (b.createdAt?.seconds || b.createdAt || 0) -
-              (a.createdAt?.seconds || a.createdAt || 0),
-          );
-          setImages(imgs as any);
-        }}
+        onOpenManageModal={() => setImageManageModalOpen(true)}
       />
 
       <CommentsSection
@@ -339,6 +333,49 @@ export default function AlbumDetailPage() {
         onConfirm={confirmDeleteLastImageWithAlbum}
         message="最後の画像を削除しようとしています"
         description="アルバムには最低1枚の画像が必要です。画像を削除する場合は、アルバムごと削除されます。アルバムを削除しますか？"
+      />
+
+      {/* 画像管理モーダル */}
+      <ImageManageModal
+        open={imageManageModalOpen}
+        onClose={() => setImageManageModalOpen(false)}
+        albumId={albumId!}
+        userId={user?.uid || ''}
+        existingImages={images
+          .filter((img) => img.uploaderId === user?.uid)
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            thumbUrl: img.thumbUrl,
+            uploaderId: img.uploaderId,
+          }))}
+        onUploaded={async () => {
+          const imgs = await listImages(albumId!);
+          imgs.sort(
+            (a: any, b: any) =>
+              (b.createdAt?.seconds || b.createdAt || 0) -
+              (a.createdAt?.seconds || a.createdAt || 0),
+          );
+          setImages(imgs as any);
+        }}
+        onDeleteImage={async (imageId: string) => {
+          // 削除API呼び出し
+          const token = await user!.getIdToken();
+          const res = await fetch('/api/images/delete', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ albumId, userId: user!.uid, imageId }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data?.error || 'DELETE_FAILED');
+          }
+          // ローカルステートからも削除
+          setImages((prev) => prev.filter((img) => img.id !== imageId));
+        }}
       />
     </div>
   );

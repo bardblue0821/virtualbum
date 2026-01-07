@@ -110,7 +110,6 @@ export default function AlbumImageCropper({ src, onCancel, onConfirm }: Props) {
             長方形
           </Button>
         </div>
-        <p className="text-xs fg-muted">枠をドラッグ/リサイズできます</p>
       </div>
 
       <div className="flex justify-center">
