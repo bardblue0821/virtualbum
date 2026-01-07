@@ -21,23 +21,79 @@
 
 ```
 virtualbum/
-├── app/              # Next.js App Router のページとレイアウト
-├── components/       # React コンポーネント（UI/機能別）
-├── lib/              # ビジネスロジック、repositories、Firebase 初期化
-│   ├── server/       # サーバーサイド専用ユーティリティ（Admin SDK、API ヘルパー）
-│   ├── errors/       # エラーハンドリング統一モジュール
-│   ├── repos/        # Firestore リポジトリ層
-│   ├── hooks/        # カスタム React Hooks
-│   └── services/     # ビジネスロジックサービス
-├── src/              # サービス層（タイムライン集約、プロフィールサービス等）
-├── types/            # 共通型定義（models.ts 等）
-├── test/             # テストファイル
-│   └── __mocks__/    # Firebase モック共通化
-├── public/           # 静的ファイル（画像、favicon 等）
-├── firestore.rules   # Firestore セキュリティルール
-├── package.json      # npm 依存関係
-└── tsconfig.json     # TypeScript 設定
+├── app/                  # Next.js App Router のページとレイアウト
+│   ├── album/[id]/       # アルバム詳細ページ
+│   │   ├── hooks/        # アルバム詳細用カスタムフック
+│   │   └── page.tsx
+│   ├── user/[id]/        # ユーザープロフィールページ
+│   │   ├── hooks/        # プロフィール用カスタムフック
+│   │   └── page.tsx
+│   └── api/              # API Routes
+├── components/           # React コンポーネント（UI/機能別）
+├── lib/                  # Firebase初期化、リポジトリ、ユーティリティ
+│   ├── errors/           # エラーハンドリング統一モジュール
+│   ├── repos/            # Firestore リポジトリ層（Client SDK）
+│   ├── constants/        # 定数定義
+│   ├── auth/             # 認証関連
+│   └── utils/            # ユーティリティ関数
+├── src/                  # アプリケーション層
+│   ├── hooks/            # カスタム React Hooks
+│   ├── services/         # ビジネスロジックサービス
+│   ├── repositories/     # Firestore リポジトリ層（Admin SDK）
+│   │   └── admin/        # Admin SDK を使用するリポジトリ
+│   ├── libs/             # サードパーティライブラリラッパー
+│   ├── models/           # ビューモデル定義
+│   ├── types/            # アプリケーション層の型定義
+│   └── components/       # src 内部で使う独立コンポーネント
+├── types/                # 外部ライブラリの型定義（.d.ts）
+├── test/                 # テストファイル
+├── scripts/              # シードスクリプト等
+├── design/               # 設計ドキュメント
+├── functions/            # Firebase Functions
+├── firestore.rules       # Firestore セキュリティルール
+├── storage.rules         # Storage セキュリティルール
+├── package.json          # npm 依存関係
+└── tsconfig.json         # TypeScript 設定
 ```
+
+---
+
+### ルート直下の設定ファイル
+
+#### Firebase 関連
+| ファイル | 説明 |
+|----------|------|
+| `firebase.json` | Firebase エミュレータ設定（Auth:9099, Firestore:8080, Storage:9199, UI:4000） |
+| `firestore.rules` | Firestore セキュリティルール定義 |
+| `firestore.indexes.json` | Firestore 複合インデックス定義 |
+| `storage.rules` | Cloud Storage セキュリティルール定義 |
+| `.firebaserc` | Firebase プロジェクトエイリアス設定 |
+
+#### ビルド・開発ツール
+| ファイル | 説明 |
+|----------|------|
+| `next.config.ts` | Next.js 設定（Turbopack、画像ドメイン許可等） |
+| `tsconfig.json` | TypeScript 設定（ES2017、strict モード、パスエイリアス `@/*`） |
+| `eslint.config.mjs` | ESLint 設定（next/core-web-vitals ベース） |
+| `postcss.config.mjs` | PostCSS 設定（Tailwind CSS 用） |
+
+#### テスト
+| ファイル | 説明 |
+|----------|------|
+| `jest.config.js` | Jest 設定（jsdom 環境、パスエイリアス対応） |
+| `jest.setup.ts` | Jest セットアップ（Testing Library、Next.js モック） |
+
+#### パッケージ管理
+| ファイル | 説明 |
+|----------|------|
+| `package.json` | npm 依存関係とスクリプト定義 |
+| `package-lock.json` | 依存関係のロックファイル |
+
+#### 環境・Git
+| ファイル | 説明 |
+|----------|------|
+| `.env.local` | ローカル環境変数（Firebase キー等、Git 管理外） |
+| `.gitignore` | Git 除外設定（node_modules、.next、.env.local 等） |
 
 ---
 
@@ -278,30 +334,19 @@ Firebase アプリ初期化と db, auth, storage のエクスポート。環境�
 #### `lib/paths.ts`
 Firestore コレクション名を定数として集中管理（`COL.users`, `COL.albums` など）。
 
-#### `lib/errors.ts`
-エラーメッセージの翻訳関数。Firebase Auth エラーコードや Firestore エラーを日本語メッセージに変換。
+#### `lib/rateLimit.ts`
+レート制限関連のユーティリティ。`isRateLimitError` でレート制限エラーを判定します。
+
+#### `lib/authUser.ts`
+認証ユーザー関連のユーティリティ。
 
 #### `lib/errors/` - エラーハンドリング統一モジュール
 
 ##### `lib/errors/index.ts`
-エラーハンドリングの統一エクスポート（AppError, translateFirebaseError, handleError, ErrorHelpers）。
+エラーハンドリングの統一エクスポート。`translateError`（シンプルなエラー翻訳）、`AppError`、`translateFirebaseError`、`handleError`、`ErrorHelpers` を提供。
 
 ##### `lib/errors/ErrorHandler.ts`
 構造化されたエラーハンドリング。カスタムエラークラス `AppError` と Toast 連携。
-
-#### `lib/server/` - サーバーサイド専用ユーティリティ
-
-##### `lib/server/firebaseAdmin.ts`
-Firebase Admin SDK の再エクスポート（verifyIdToken, getAdminAuth, getAdminDb）。
-
-##### `lib/server/adminRepo.ts`
-Admin SDK を使用する Firestore リポジトリ関数の再エクスポート。
-
-##### `lib/server/apiHelpers.ts`
-API Route 用ユーティリティ。認証付きハンドラー `withAuth`、レスポンスヘルパー `ApiResponse`、レート制限 `checkRateLimit` を提供。
-
-##### `lib/server/index.ts`
-サーバーサイドユーティリティの統一エクスポート。
 
 #### `lib/constants/` - 定数定義
 
@@ -346,99 +391,130 @@ API Route 用ユーティリティ。認証付きハンドラー `withAuth`、�
 ##### `lib/repos/timelineRepo.ts`
 タイムライン用のアルバム取得クエリ。指定オーナー ID リストと公開設定を考慮してフェッチします。
 
-##### `lib/repos/blockRepo.ts`
-ブロック機能用リポジトリ（**現在未実装、ファイルは空**）。将来的にユーザーブロック機能を実装予定。
-
-#### `lib/services/` - サービス層
-
-##### `lib/services/avatar.ts`
-アバター画像のアップロードおよびリサイズ処理。react-easy-crop で生成した Blob を Storage へ保存します。
-
-##### `lib/services/createAlbumWithImages.ts`
-アルバムと画像を一括作成するサービス。複数画像のアップロードをトランザクション的に処理します。
-
-##### `lib/services/deleteAccount.ts`
-アカウント削除サービス。ユーザー情報、アルバム、画像、コメント、フレンド申請などを一括削除します（実装中）。
-
-##### `lib/services/sendVerificationDev.ts`
-メール確認リンク送信サービス（開発用）。Nodemailer でメール送信を予定しています（実装中）。
-
-#### `lib/hooks/` - カスタム React Hooks
-
-##### `lib/hooks/useAuthUser.ts`
-Firebase Auth のユーザー状態を管理するフック。
-
-##### `lib/hooks/useFriendship.ts`
-フレンド関係の取得・操作を行うフック。
-
-##### `lib/hooks/useWatch.ts`
-ウォッチ（フォロー）関係の取得・操作を行うフック。
-
-##### `lib/hooks/useAlbumDetail.ts`
-アルバム詳細データの取得を行うフック。
-
-##### `lib/hooks/useNotificationsBadge.ts`
-未読通知数のバッジ表示用フック。
-
-##### `lib/hooks/useTimelineItemVisibility.ts`
-タイムラインアイテムの可視性を検出するフック（IntersectionObserver 使用）。
-
-##### `lib/hooks/useVerificationGuard.ts`
-メール確認済みかをチェックするガードフック。
-
-##### `lib/hooks/useAsyncOperation.ts`
-非同期操作の loading/error 状態を管理する汎用フック。
-
 ---
 
-### `src/` - アプリケーション層サービス
-
-#### `src/services/timeline/listLatestAlbums.ts` (290 lines)
-**タイムライン集約サービス**。自分、フレンド、ウォッチ中ユーザーの最新アルバムを取得し、画像、コメントプレビュー、いいね、リポスト、リアクションを集約して TimelineItemVM を生成します。ユーザー情報のバッチ取得による N+1 問題の最適化、権限エラー発生時のフォールバックロジックを実装しています。環境対応ロガー (`createLogger`) を使用。
-
-#### `src/services/profile/buildPatch.ts`
-プロフィール編集時のパッチデータを構築するサービス。
+### `src/` - アプリケーション層
 
 #### `src/hooks/` - カスタム React Hooks
+
+##### `src/hooks/useAuthUser.ts`
+Firebase Auth のユーザー状態を管理するフック。
+
+##### `src/hooks/useFriendship.ts`
+フレンド関係の取得・操作を行うフック。
+
+##### `src/hooks/useWatch.ts`
+ウォッチ（フォロー）関係の取得・操作を行うフック。
+
+##### `src/hooks/useAlbumDetail.ts`
+アルバム詳細データの取得を行うフック。
 
 ##### `src/hooks/useAlbumAccess.ts`
 アルバムへのアクセス権限をチェックするフック。
 
+##### `src/hooks/useNotificationsBadge.ts`
+未読通知数のバッジ表示用フック。
+
+##### `src/hooks/useTimelineItemVisibility.ts`
+タイムラインアイテムの可視性を検出するフック（IntersectionObserver 使用）。
+
+##### `src/hooks/useVerificationGuard.ts`
+メール確認済みかをチェックするガードフック。
+
+##### `src/hooks/useAsyncOperation.ts`
+非同期操作の loading/error 状態を管理する汎用フック。
+
 ##### `src/hooks/useThumbBackfill.ts`
 サムネイル画像のバックフィル処理を行うフック。
 
-#### `src/repositories/admin/firestore.ts`
-Admin SDK を使用する Firestore 操作関数（adminAddImage, adminDeleteImage, adminToggleLike 等）。
+#### `src/services/` - ビジネスロジックサービス
 
-#### `src/libs/firebaseAdmin.ts`
-Firebase Admin SDK 初期化と認証・DB アクセス関数。環境対応ロガーを使用。
+##### `src/services/avatar.ts`
+アバター画像のアップロードおよびリサイズ処理。react-easy-crop で生成した Blob を Storage へ保存します。
+
+##### `src/services/createAlbumWithImages.ts`
+アルバムと画像を一括作成するサービス。複数画像のアップロードをトランザクション的に処理します。
+
+##### `src/services/deleteAccount.ts`
+アカウント削除サービス。ユーザー情報、アルバム、画像、コメント、フレンド申請などを一括削除します（実装中）。
+
+##### `src/services/sendVerificationDev.ts`
+メール確認リンク送信サービス（開発用）。Nodemailer でメール送信を予定しています（実装中）。
+
+##### `src/services/timeline/listLatestAlbums.ts`
+**タイムライン集約サービス**。自分、フレンド、ウォッチ中ユーザーの最新アルバムを取得し、画像、コメントプレビュー、いいね、リポスト、リアクションを集約して TimelineItemVM を生成します。
+
+##### `src/services/profile/buildPatch.ts`
+プロフィール編集時のパッチデータを構築するサービス。
+
+#### `src/repositories/admin/` - Admin SDK リポジトリ
+
+##### `src/repositories/admin/firestore.ts`
+Admin SDK を使用する Firestore 操作関数（adminAddImage, adminDeleteImage, adminToggleLike, adminGetFriendStatus, adminGetAlbum, adminCanUploadMoreImages 等）。
+
+#### `src/libs/` - ライブラリラッパー
+
+##### `src/libs/firebaseAdmin.ts`
+Firebase Admin SDK 初期化と認証・DB アクセス関数（verifyIdToken, getAdminAuth, getAdminDb）。環境対応ロガーを使用。
 
 #### `src/models/`
 アプリケーション層のビューモデル定義（TimelineItemVM, UserRef 等）。
 
-#### `src/types/`
-型定義ファイル（models.ts など）。Firestore ドキュメント型を定義します。
+#### `src/types/` - 型定義
 
-#### `src/hooks/`
-カスタム React Hooks（useUser, useAuth 等）を配置予定。
+##### `src/types/firestore.ts`
+Firestore ドキュメント型を定義（ERR 定数を含む）。
 
-#### `src/utils/`
-汎用ユーティリティ関数（日付変換、バリデーション等）。
+##### `src/types/firebase-admin.d.ts`
+Firebase Admin SDK の型定義。
 
-#### `src/constants/`
-アプリケーション全体で使用する定数（リアクション絵文字、エラーメッセージ等）。
+---
 
-#### `src/components/`
-src 内部で使う独立コンポーネント（存在する場合）。
+### `app/album/[id]/hooks/` - アルバム詳細ページ用フック
 
-#### `src/repositories/`
-将来的に lib/repos から移行する可能性がある Firestore アクセス層（現在未使用）。
+##### `app/album/[id]/hooks/useAlbumData.ts`
+アルバム、画像、コメント、リアクションのデータ取得とリアルタイム購読。
 
-#### `src/libs/`
-サードパーティライブラリの薄いラッパー（axios, Firebase 等）を配置予定。
+##### `app/album/[id]/hooks/useLikes.ts`
+いいね状態の管理と楽観更新。
 
-#### `src/README.md`
-src ディレクトリの構成と役割を説明するドキュメント（存在する場合）。
+##### `app/album/[id]/hooks/useReactions.ts`
+リアクション状態の管理、絵文字ピッカー、楽観更新。
+
+##### `app/album/[id]/hooks/useComments.ts`
+コメントの追加、編集、削除操作。
+
+##### `app/album/[id]/hooks/useAlbumEdit.ts`
+アルバムタイトル、公開設定の編集と保存。
+
+##### `app/album/[id]/hooks/useImageActions.ts`
+画像の追加、削除操作。
+
+##### `app/album/[id]/hooks/index.ts`
+フックの統一エクスポート。
+
+---
+
+### `app/user/[id]/hooks/` - プロフィールページ用フック
+
+##### `app/user/[id]/hooks/useProfileData.ts`
+プロフィールデータの取得と状態管理。
+
+##### `app/user/[id]/hooks/useProfileEdit.ts`
+プロフィール編集操作。
+
+##### `app/user/[id]/hooks/index.ts`
+フックの統一エクスポート。
+
+---
+
+### `types/` - 外部ライブラリ型定義
+
+##### `types/lightgallery-react.d.ts`
+lightgallery/react の型定義。
+
+##### `types/react-photo-album.d.ts`
+react-photo-album の型定義。
 
 ---
 
@@ -810,6 +886,29 @@ Firestore セキュリティルールは、**読み取りを permissive（基本
 ---
 
 **作成日:** 2025-01-XX  
-**最終更新:** 2026-01-02  
-**バージョン:** 1.1
+**最終更新:** 2026-01-07  
+**バージョン:** 1.2
 
+---
+
+## 変更履歴
+
+### v1.2 (2026-01-07)
+- **ディレクトリ構造の整理**
+  - `lib/server/` ディレクトリを削除（未使用のre-exportファイル群）
+  - `lib/errors.ts` を `lib/errors/index.ts` に統合
+  - `lib/errors/USAGE_EXAMPLES.ts` を削除（実行されないサンプルコード）
+  - `types/react-photo-gallery.d.ts` を削除（未使用）
+  - `src/constants/` 空ディレクトリを削除
+- **hooks のリファクタリング**
+  - `lib/hooks/` を `src/hooks/` に移行
+  - `lib/services/` を `src/services/` に移行
+  - `app/album/[id]/page.tsx` を6つのカスタムフックに分割（885行→約270行）
+  - `app/album/[id]/hooks/` ディレクトリを新規作成
+  - `app/user/[id]/hooks/` ディレクトリを新規作成
+- **Admin SDK 機能追加**
+  - `adminGetFriendStatus`, `adminGetAlbum`, `adminCanUploadMoreImages` を追加
+  - `/api/images/add` をAdmin SDK使用に変更（フレンド限定アルバムへの画像追加対応）
+
+### v1.1 (2026-01-02)
+- 初期バージョン
