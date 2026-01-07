@@ -5,12 +5,14 @@ import { createAlbumWithImages, AlbumCreateProgress } from '@/src/services/creat
 import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
 import { isRateLimitError } from '../lib/rateLimit';
-import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } from '@mantine/core';
-import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
+import { Stack, Group, Text, Progress } from '@mantine/core';
 import { useToast } from './ui/Toast';
 import AlbumImageCropper from './upload/AlbumImageCropper';
 import { getCroppedBlobSized } from '@/src/services/avatar';
-import { Button as AppButton, IconButton as AppIconButton } from './ui/Button';
+import { Button as AppButton } from './ui/Button';
+
+const MAX_IMAGES = 4;
+const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
 interface Props { onCreated?: (albumId: string) => void }
 
@@ -18,6 +20,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   const { user } = useAuthUser();
   const router = useRouter();
   const toast = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [placeUrl, setPlaceUrl] = useState('');
   const [comment, setComment] = useState('');
@@ -47,42 +50,46 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleDrop(dropped: File[]) {
+  // ファイル選択処理（追加型）
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
     setError(null);
-    if (!dropped || dropped.length === 0) return;
-    const allow = 4;
-    const accepted = dropped.slice(0, allow);
-    if (dropped.length > allow) {
-      setError('画像は最大4枚までです');
+
+    const remaining = MAX_IMAGES - previews.length;
+    if (remaining <= 0) {
+      toast.error('これ以上追加できません（上限4枚）');
+      return;
     }
-    // 既存のプレビューを解放
-    previews.forEach((p) => URL.revokeObjectURL(p.url));
-    croppedPreviews.forEach((p) => p && URL.revokeObjectURL(p.url));
-    const nextPreviews = accepted.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
-    setPreviews(nextPreviews);
-    setCroppedPreviews(new Array(nextPreviews.length).fill(null));
-    setFiles(accepted);
+
+    const accepted: { file: File; url: string }[] = [];
+    for (let i = 0; i < Math.min(fileList.length, remaining); i++) {
+      const file = fileList[i];
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        toast.error(`${file.name}: 画像ファイルのみ対応しています`);
+        continue;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name}: サイズ上限 5MB を超えています`);
+        continue;
+      }
+      accepted.push({ file, url: URL.createObjectURL(file) });
+    }
+
+    if (accepted.length > 0) {
+      setPreviews((prev) => [...prev, ...accepted]);
+      setCroppedPreviews((prev) => [...prev, ...new Array(accepted.length).fill(null)]);
+      setFiles((prev) => [...prev, ...accepted.map((a) => a.file)]);
+    }
+
+    // inputをリセット（同じファイルを再選択可能に）
+    e.target.value = '';
   }
 
-  function handleReject(fileRejections: any[]) {
-    // maxSize 超過などで onDrop に来ない場合も、理由を伝える
-    const rejected = Array.isArray(fileRejections) ? fileRejections : [];
-    const tooLarge = rejected
-      .map((r) => r?.file as File | undefined)
-      .filter((f): f is File => !!f)
-      .filter((f) => f.size > 5 * 1024 * 1024);
-
-    if (tooLarge.length > 0) {
-      const names = tooLarge.slice(0, 3).map((f) => f.name).join('、');
-      const more = tooLarge.length > 3 ? ` ほか${tooLarge.length - 3}件` : '';
-      const msg = `サイズ上限 5MB を超えています: ${names}${more}`;
-      setError(msg);
-      toast.error(msg);
-    } else if (rejected.length > 0) {
-      const msg = '追加できないファイルがあります（画像のみ / 1枚 5MB まで）';
-      setError(msg);
-      toast.error(msg);
-    }
+  // 空きマスクリックでファイル選択を開く
+  function handleEmptySlotClick() {
+    if (loading || !user || previews.length >= MAX_IMAGES) return;
+    fileInputRef.current?.click();
   }
 
   function removeOne(target: File) {
@@ -285,88 +292,84 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           </p>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" aria-label="画像選択">画像 (最大4枚)</label>
-          <Paper withBorder p="md" radius="md" className="surface">
-            <Stack gap="xs">
-              <Dropzone
-                onDrop={handleDrop}
-                onReject={handleReject}
-                accept={IMAGE_MIME_TYPE}
-                disabled={loading || !user}
-                multiple
-                maxSize={5 * 1024 * 1024}
-                className="rounded-md border-2 border-dashed border-base hover:border-(--accent) hover-surface-alt transition-colors cursor-pointer py-12"
+          <label className="block text-sm font-medium mb-2" aria-label="画像選択">画像 (最大4枚)</label>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+            disabled={loading || !user}
+          />
+          
+          {/* 田の字グリッド（2x2） */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 選択済み画像 */}
+            {previews.map((p, idx) => (
+              <div
+                key={p.url}
+                className="relative aspect-square rounded-lg overflow-hidden border-2 border-line surface-alt"
               >
-                <Group justify="center" mih={140} className="text-center px-2">
-                  <Dropzone.Accept>
-                    <div>
-                      <Text fw={700}>ここにドロップして追加</Text>
-                      <Text size="xs" c="dimmed">最大 4 枚 / 1枚 5MB まで</Text>
-                    </div>
-                  </Dropzone.Accept>
-                  <Dropzone.Reject>
-                    <div>
-                      <Text fw={700} c="red">このファイルは追加できません</Text>
-                      <Text size="xs" c="dimmed">画像のみ（PNG / JPEG / GIF）・1枚 5MB まで</Text>
-                    </div>
-                  </Dropzone.Reject>
-                  <Dropzone.Idle>
-                    <div>
-                      <Text fw={700}>画像をここにドラッグ＆ドロップ</Text>
-                      <Text size="xs" c="dimmed">またはクリックして選択（最大 4 枚 / 1枚 5MB）</Text>
-                    </div>
-                  </Dropzone.Idle>
-                </Group>
-              </Dropzone>
-
-              {previews.length > 0 && (
-                <Stack gap="xs" mt="sm">
-                  <Group justify="space-between" align="center">
-                    <Text size="xs" c="dimmed">選択中: {previews.length} / 4</Text>
-                    <Button type="button" size="xs" variant="default" onClick={clearAll} disabled={loading} className="cursor-pointer disabled:cursor-not-allowed">すべて外す</Button>
-                  </Group>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {previews.map((p, idx) => (
-                      <div key={p.url} className="relative rounded-md border border-base surface-alt p-2">
-                        <button
-                          type="button"
-                          aria-label={`${p.file.name} を削除`}
-                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600 text-white text-lg leading-none flex items-center justify-center hover:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                          onClick={(e) => { e.stopPropagation(); removeOne(p.file); }}
-                          disabled={loading}
-                        >
-                          ×
-                        </button>
-
-                        <div
-                          className="cursor-pointer"
-                          onClick={() => openCrop(idx)}
-                          role="button"
-                          aria-label={`${p.file.name} を切り抜く`}
-                        >
-                          <MantineImage
-                            src={croppedPreviews[idx]?.url ?? p.url}
-                            alt={p.file.name}
-                            radius="sm"
-                            fit="cover"
-                            className="overflow-hidden"
-                            style={{ height: 120, width: '100%', objectFit: 'cover' }}
-                          />
-                        </div>
-                        <div className="mt-2 min-w-0">
-                          <Text size="xs" fw={600} className="truncate">
-                            {p.file.name}
-                          </Text>
-                          <Text size="xs" c="dimmed">{fmtBytes((croppedPreviews[idx]?.file ?? p.file).size)}</Text>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Stack>
-              )}
-            </Stack>
-          </Paper>
+                {/* 削除ボタン */}
+                <button
+                  type="button"
+                  aria-label={`${p.file.name} を削除`}
+                  className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-red-600 text-white text-lg leading-none flex items-center justify-center hover:bg-red-700 cursor-pointer disabled:opacity-50"
+                  onClick={(e) => { e.stopPropagation(); removeOne(p.file); }}
+                  disabled={loading}
+                >
+                  ×
+                </button>
+                
+                {/* 画像（クリックでクロップ） */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={croppedPreviews[idx]?.url ?? p.url}
+                  alt={p.file.name}
+                  className="w-full h-full object-cover cursor-pointer"
+                  onClick={() => openCrop(idx)}
+                />
+                
+                {/* クリックで切抜ラベル */}
+                <span className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded">
+                  クリックで切抜
+                </span>
+              </div>
+            ))}
+            
+            {/* 空きマス */}
+            {Array.from({ length: MAX_IMAGES - previews.length }).map((_, i) => (
+              <button
+                key={`empty-${i}`}
+                type="button"
+                onClick={handleEmptySlotClick}
+                disabled={loading || !user}
+                className="aspect-square rounded-lg border-2 border-dashed border-line flex flex-col items-center justify-center gap-2 hover:border-[var(--accent)] hover:bg-surface-weak transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span className="text-sm text-muted">画像を選択</span>
+              </button>
+            ))}
+          </div>
+          
+          {previews.length > 0 && (
+            <div className="mt-3 flex justify-between items-center">
+              <p className="text-xs text-muted">選択中: {previews.length} / {MAX_IMAGES}</p>
+              <button
+                type="button"
+                onClick={clearAll}
+                disabled={loading}
+                className="text-xs text-red-500 hover:text-red-600 cursor-pointer disabled:opacity-50"
+              >
+                すべて外す
+              </button>
+            </div>
+          )}
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {loading && (
@@ -400,27 +403,25 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           onClick={closeCrop}
         >
           <div
-            className="surface-alt border border-base rounded shadow-lg w-[min(96vw,720px)] p-4 relative"
+            className="surface-alt border border-line rounded shadow-lg w-[min(96vw,720px)] p-4 relative"
             onClick={(e) => e.stopPropagation()}
           >
-            <AppIconButton
+            <button
               type="button"
-              variant="ghost"
-              size="xs"
-              className="absolute top-2 right-2 fg-muted hover-surface-alt cursor-pointer disabled:cursor-not-allowed"
+              className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-muted hover:bg-surface-weak rounded cursor-pointer disabled:cursor-not-allowed"
               onClick={closeCrop}
               aria-label="閉じる"
               disabled={cropping}
             >
               ✕
-            </AppIconButton>
+            </button>
             <h2 className="text-sm font-semibold mb-3">画像を切り抜く</h2>
             <AlbumImageCropper
               src={cropSrc ?? previews[cropIndex].url}
               onCancel={closeCrop}
               onConfirm={(area, _zoom, aspect) => applyCrop(cropIndex, area, aspect)}
             />
-            {cropping && <p className="text-xs fg-muted mt-2">切り抜き中...</p>}
+            {cropping && <p className="text-xs text-muted mt-2">切り抜き中...</p>}
           </div>
         </div>
       )}
