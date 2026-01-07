@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:emulator": "cross-env NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,10 +12,14 @@
     "test:watch": "jest --watch",
     "test:frontend": "jest test/frontend",
     "test:backend": "jest test/backend",
-    "test:emulator": "firebase emulators:exec --only auth,firestore,storage \"jest test/integration --runInBand\"",
-    "test:integration": "jest test/integration --runInBand",
+    "test:emulator": "firebase emulators:exec --only auth,firestore,storage \"jest --config test/integration/jest.config.js --runInBand\"",
+    "test:integration": "jest --config test/integration/jest.config.js --runInBand",
     "emulator": "firebase emulators:start --only auth,firestore,storage",
-    "emulator:ui": "firebase emulators:start"
+    "emulator:ui": "firebase emulators:start",
+    "seed:small": "npx tsx scripts/seed-emulator.ts small",
+    "seed:medium": "npx tsx scripts/seed-emulator.ts medium",
+    "seed:large": "npx tsx scripts/seed-emulator.ts large",
+    "seed:reset": "npx tsx scripts/seed-emulator.ts reset"
   },
   "dependencies": {
     "@emotion/react": "^11",
@@ -46,6 +51,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "^16.1.0",
     "firebase-tools": "^15.1.0",
@@ -53,6 +59,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.6",
     "typescript": "^5"
   }
 }

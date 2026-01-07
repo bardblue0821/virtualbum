@@ -1,26 +1,13 @@
-/**
- * Firebase Emulator テストヘルパー
- * エミュレータ接続、データクリーンアップ、認証ヘルパー
- */
-
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   initializeTestEnvironment,
   RulesTestEnvironment,
   assertSucceeds,
   assertFails,
+  RulesTestContext,
 } from '@firebase/rules-unit-testing';
-import {
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  deleteDoc,
-  collection,
-  query,
-  Firestore,
-} from 'firebase/firestore';
 
-// エミュレータ設定
 export const EMULATOR_CONFIG = {
   projectId: 'virtualbum-test',
   auth: { host: 'localhost', port: 9099 },
@@ -30,49 +17,34 @@ export const EMULATOR_CONFIG = {
 
 let testEnv: RulesTestEnvironment | null = null;
 
-/**
- * テスト環境を初期化
- */
-export async function setupTestEnvironment(): Promise<RulesTestEnvironment> {
-  if (testEnv) {
-    return testEnv;
+function loadFirestoreRules(): string {
+  const rulesPath = path.resolve(__dirname, '../../firestore.rules');
+  if (fs.existsSync(rulesPath)) {
+    return fs.readFileSync(rulesPath, 'utf8');
   }
+  return 'rules_version = "2"; service cloud.firestore { match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } } }';
+}
 
+export async function setupTestEnvironment(): Promise<RulesTestEnvironment> {
+  if (testEnv) return testEnv;
+  const rules = loadFirestoreRules();
+  console.log('Loading firestore.rules for emulator testing');
   testEnv = await initializeTestEnvironment({
     projectId: EMULATOR_CONFIG.projectId,
     firestore: {
       host: EMULATOR_CONFIG.firestore.host,
       port: EMULATOR_CONFIG.firestore.port,
-      rules: `
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            // テスト用に全て許可
-            match /{document=**} {
-              allow read, write: if true;
-            }
-          }
-        }
-      `,
+      rules,
     },
   });
-
   return testEnv;
 }
 
-/**
- * Firestore の全データをクリア
- */
 export async function clearFirestoreData(): Promise<void> {
-  if (!testEnv) {
-    throw new Error('Test environment not initialized. Call setupTestEnvironment first.');
-  }
+  if (!testEnv) throw new Error('Test environment not initialized');
   await testEnv.clearFirestore();
 }
 
-/**
- * テスト環境をクリーンアップ
- */
 export async function cleanupTestEnvironment(): Promise<void> {
   if (testEnv) {
     await testEnv.cleanup();
@@ -80,77 +52,74 @@ export async function cleanupTestEnvironment(): Promise<void> {
   }
 }
 
-/**
- * 認証済みユーザーとして Firestore にアクセス
- */
-export function getAuthenticatedFirestore(userId: string): Firestore {
-  if (!testEnv) {
-    throw new Error('Test environment not initialized. Call setupTestEnvironment first.');
-  }
-  return testEnv.authenticatedContext(userId).firestore();
+export function getAuthenticatedContext(userId: string): RulesTestContext {
+  if (!testEnv) throw new Error('Test environment not initialized');
+  return testEnv.authenticatedContext(userId);
 }
 
-/**
- * 未認証ユーザーとして Firestore にアクセス
- */
-export function getUnauthenticatedFirestore(): Firestore {
-  if (!testEnv) {
-    throw new Error('Test environment not initialized. Call setupTestEnvironment first.');
-  }
-  return testEnv.unauthenticatedContext().firestore();
+export function getUnauthenticatedContext(): RulesTestContext {
+  if (!testEnv) throw new Error('Test environment not initialized');
+  return testEnv.unauthenticatedContext();
 }
 
-/**
- * Admin として Firestore にアクセス (ルールバイパス)
- */
-export function getAdminFirestore(): Firestore {
-  if (!testEnv) {
-    throw new Error('Test environment not initialized. Call setupTestEnvironment first.');
-  }
-  // @ts-expect-error - rules-unit-testing の型が不完全
-  return testEnv.withSecurityRulesDisabled((context) => context.firestore());
+export async function withAdminContext(
+  callback: (context: RulesTestContext) => Promise<void>
+): Promise<void> {
+  if (!testEnv) throw new Error('Test environment not initialized');
+  await testEnv.withSecurityRulesDisabled(callback);
 }
 
-/**
- * テストユーティリティをエクスポート
- */
 export { assertSucceeds, assertFails };
 
-/**
- * コレクション内の全ドキュメントを削除
- */
-export async function clearCollection(db: Firestore, collectionPath: string): Promise<void> {
-  const q = query(collection(db, collectionPath));
-  const snapshot = await getDocs(q);
-  const deletePromises = snapshot.docs.map((docSnapshot) =>
-    deleteDoc(docSnapshot.ref)
-  );
-  await Promise.all(deletePromises);
-}
-
-/**
- * 複数ドキュメントを一括作成 (バッチシード)
- */
-export async function seedDocuments<T extends object>(
-  db: Firestore,
+export async function adminSetDoc(
   collectionPath: string,
-  documents: Array<{ id: string; data: T }>
+  docId: string,
+  data: Record<string, unknown>
 ): Promise<void> {
-  const promises = documents.map(({ id, data }) =>
-    setDoc(doc(db, collectionPath, id), data as Record<string, unknown>)
-  );
-  await Promise.all(promises);
+  await withAdminContext(async (context) => {
+    const db = context.firestore();
+    await db.collection(collectionPath).doc(docId).set(data);
+  });
 }
 
-/**
- * ドキュメントを取得
- */
-export async function getDocument<T>(
-  db: Firestore,
+export async function adminGetDoc(
   collectionPath: string,
   docId: string
-): Promise<T | null> {
-  const docRef = doc(db, collectionPath, docId);
-  const snapshot = await getDoc(docRef);
-  return snapshot.exists() ? (snapshot.data() as T) : null;
+): Promise<Record<string, unknown> | null> {
+  let result: Record<string, unknown> | null = null;
+  await withAdminContext(async (context) => {
+    const db = context.firestore();
+    const snapshot = await db.collection(collectionPath).doc(docId).get();
+    result = snapshot.exists ? (snapshot.data() as Record<string, unknown>) : null;
+  });
+  return result;
+}
+
+export async function adminSeedDocuments(
+  collectionPath: string,
+  documents: Array<{ id: string; data: Record<string, unknown> }>
+): Promise<void> {
+  await withAdminContext(async (context) => {
+    const db = context.firestore();
+    const batch = db.batch();
+    documents.forEach(({ id, data }) => {
+      const ref = db.collection(collectionPath).doc(id);
+      batch.set(ref, data);
+    });
+    await batch.commit();
+  });
+}
+
+export async function adminGetDocs(
+  collectionPath: string
+): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
+  const results: Array<{ id: string; data: Record<string, unknown> }> = [];
+  await withAdminContext(async (context) => {
+    const db = context.firestore();
+    const snapshot = await db.collection(collectionPath).get();
+    snapshot.forEach((doc) => {
+      results.push({ id: doc.id, data: doc.data() as Record<string, unknown> });
+    });
+  });
+  return results;
 }

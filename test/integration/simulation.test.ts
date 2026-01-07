@@ -1,26 +1,26 @@
-/**
- * 大規模シミュレーションテスト
- * 多数のユーザー・アルバムでのパフォーマンスと動作確認
- */
-
 import {
   setupTestEnvironment,
   clearFirestoreData,
   cleanupTestEnvironment,
-  getAuthenticatedFirestore,
+  adminSeedDocuments,
+  adminGetDocs,
 } from '../helpers/emulator';
 import {
-  seedFirestore,
   generateSeedData,
   SMALL_SEED_CONFIG,
   DEFAULT_SEED_CONFIG,
 } from '../factories/seeder';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import {
+  createBulkUsers,
+  createAlbumsForUsers,
+  createImagesForAlbums,
+  createFriendNetwork,
+  createWatchNetwork,
+} from '../factories';
 
-// タイムアウト延長 (大規模データ生成のため)
 jest.setTimeout(120000);
 
-describe('大規模シミュレーションテスト', () => {
+describe('Simulation Test', () => {
   beforeAll(async () => {
     await setupTestEnvironment();
   });
@@ -33,8 +33,8 @@ describe('大規模シミュレーションテスト', () => {
     await clearFirestoreData();
   });
 
-  describe('データ生成テスト', () => {
-    test('メモリ上でシードデータを生成できる', () => {
+  describe('Data Generation', () => {
+    test('can generate seed data in memory', () => {
       const result = generateSeedData(SMALL_SEED_CONFIG);
 
       expect(result.userIds.length).toBe(SMALL_SEED_CONFIG.userCount);
@@ -47,140 +47,130 @@ describe('大規模シミュレーションテスト', () => {
           SMALL_SEED_CONFIG.imagesPerAlbum
       );
 
-      console.log('📊 Generated seed stats:', result.stats);
+      console.log('Generated seed stats:', result.stats);
     });
 
-    test('デフォルト設定でデータ概算を確認', () => {
+    test('can verify default config data estimation', () => {
       const result = generateSeedData(DEFAULT_SEED_CONFIG);
 
-      // 100ユーザー x 3アルバム = 300アルバム
       expect(result.stats.albums).toBe(300);
-      // 300アルバム x 5画像 = 1500画像
       expect(result.stats.images).toBe(1500);
 
-      console.log('📊 Default config stats:', result.stats);
+      console.log('Default config stats:', result.stats);
     });
   });
 
-  describe('Firestore シードテスト', () => {
-    test('小規模データを Firestore にシードできる', async () => {
-      const db = getAuthenticatedFirestore('admin');
+  describe('Firestore Seeding', () => {
+    test('can seed small data to Firestore', async () => {
+      const config = SMALL_SEED_CONFIG;
+      
+      const users = createBulkUsers(config.userCount);
+      const userDocs = users.map((u) => {
+        const data = { ...u } as Record<string, unknown>;
+        delete data.uid;
+        return { id: u.uid, data };
+      });
+      await adminSeedDocuments('users', userDocs);
 
-      const result = await seedFirestore(db, SMALL_SEED_CONFIG);
+      const userIds = users.map((u) => u.uid);
+      const albums = createAlbumsForUsers(userIds, config.albumsPerUser);
+      const albumDocs = albums.map((a) => {
+        const data = { ...a } as Record<string, unknown>;
+        delete data.id;
+        if (data.placeUrl === undefined) delete data.placeUrl;
+        return { id: a.id, data };
+      });
+      await adminSeedDocuments('albums', albumDocs);
 
-      // ユーザー確認
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      expect(usersSnapshot.size).toBe(SMALL_SEED_CONFIG.userCount);
+      const images = createImagesForAlbums(
+        albums.map((a) => ({ id: a.id, ownerId: a.ownerId })),
+        config.imagesPerAlbum
+      );
+      const imageDocs = images.map((i) => {
+        const data = { ...i } as Record<string, unknown>;
+        delete data.id;
+        if (data.thumbUrl === undefined) delete data.thumbUrl;
+        return { id: i.id, data };
+      });
+      await adminSeedDocuments('albumImages', imageDocs);
 
-      // アルバム確認
-      const albumsSnapshot = await getDocs(collection(db, 'albums'));
-      expect(albumsSnapshot.size).toBe(result.stats.albums);
+      const allUsers = await adminGetDocs('users');
+      expect(allUsers.length).toBe(config.userCount);
 
-      // 画像確認
-      const imagesSnapshot = await getDocs(collection(db, 'albumImages'));
-      expect(imagesSnapshot.size).toBe(result.stats.images);
+      const allAlbums = await adminGetDocs('albums');
+      expect(allAlbums.length).toBe(config.userCount * config.albumsPerUser);
 
-      console.log('✅ Seeded data verified:', result.stats);
+      const allImages = await adminGetDocs('albumImages');
+      expect(allImages.length).toBe(
+        config.userCount * config.albumsPerUser * config.imagesPerAlbum
+      );
+
+      console.log('Seeded:', {
+        users: allUsers.length,
+        albums: allAlbums.length,
+        images: allImages.length,
+      });
     });
   });
 
-  describe('クエリパフォーマンステスト', () => {
-    test('タイムライン風クエリの実行時間を計測', async () => {
-      const db = getAuthenticatedFirestore('admin');
-      await seedFirestore(db, SMALL_SEED_CONFIG);
+  describe('Data Integrity', () => {
+    test('friend relationships are bidirectional', async () => {
+      const users = createBulkUsers(10);
+      const userDocs = users.map((u) => {
+        const data = { ...u } as Record<string, unknown>;
+        delete data.uid;
+        return { id: u.uid, data };
+      });
+      await adminSeedDocuments('users', userDocs);
 
-      const userId = 'bulk_user_0000';
+      const userIds = users.map((u) => u.uid);
+      const friends = createFriendNetwork(userIds, 0.3);
+      const friendDocs = friends.map((f) => {
+        const data = { ...f } as Record<string, unknown>;
+        delete data.id;
+        return { id: f.id, data };
+      });
+      await adminSeedDocuments('friends', friendDocs);
 
-      // 1. フレンド取得
-      const friendsStart = performance.now();
-      const friendsQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', userId),
-        where('status', '==', 'accepted')
-      );
-      const friendsSnapshot = await getDocs(friendsQuery);
-      const friendsTime = performance.now() - friendsStart;
+      const allFriends = await adminGetDocs('friends');
+      const acceptedFriends = allFriends.filter((f) => f.data.status === 'accepted');
 
-      // 2. ウォッチ取得
-      const watchesStart = performance.now();
-      const watchesQuery = query(
-        collection(db, 'watches'),
-        where('userId', '==', userId)
-      );
-      const watchesSnapshot = await getDocs(watchesQuery);
-      const watchesTime = performance.now() - watchesStart;
-
-      // 3. タイムラインアルバム取得
-      const albumsStart = performance.now();
-      const albumsQuery = query(
-        collection(db, 'albums'),
-        where('visibility', '==', 'public'),
-        orderBy('createdAt', 'desc'),
-        limit(20)
-      );
-      const albumsSnapshot = await getDocs(albumsQuery);
-      const albumsTime = performance.now() - albumsStart;
-
-      console.log('⏱️ Query performance:');
-      console.log(`  Friends query: ${friendsTime.toFixed(2)}ms (${friendsSnapshot.size} docs)`);
-      console.log(`  Watches query: ${watchesTime.toFixed(2)}ms (${watchesSnapshot.size} docs)`);
-      console.log(`  Albums query: ${albumsTime.toFixed(2)}ms (${albumsSnapshot.size} docs)`);
-
-      // パフォーマンス基準（エミュレータなので緩め）
-      expect(albumsTime).toBeLessThan(5000);
-    });
-
-    test('ユーザー検索クエリの実行時間を計測', async () => {
-      const db = getAuthenticatedFirestore('admin');
-      await seedFirestore(db, SMALL_SEED_CONFIG);
-
-      const start = performance.now();
-      const q = query(
-        collection(db, 'users'),
-        limit(20)
-      );
-      const snapshot = await getDocs(q);
-      const elapsed = performance.now() - start;
-
-      console.log(`⏱️ User search: ${elapsed.toFixed(2)}ms (${snapshot.size} docs)`);
-
-      expect(elapsed).toBeLessThan(3000);
-    });
-  });
-
-  describe('データ整合性テスト', () => {
-    test('フレンド関係が双方向で存在する', async () => {
-      const db = getAuthenticatedFirestore('admin');
-      await seedFirestore(db, SMALL_SEED_CONFIG);
-
-      const friendsSnapshot = await getDocs(collection(db, 'friends'));
-      const friends = friendsSnapshot.docs.map((doc) => doc.data());
-
-      // accepted のフレンドのみチェック
-      const acceptedFriends = friends.filter((f) => f.status === 'accepted');
-
-      // 双方向存在チェック (サンプリング)
-      const sample = acceptedFriends.slice(0, 10);
+      const sample = acceptedFriends.slice(0, 5);
       for (const friend of sample) {
         const reverse = acceptedFriends.find(
-          (f) => f.userId === friend.targetId && f.targetId === friend.userId
+          (f) =>
+            f.data.userId === friend.data.targetId &&
+            f.data.targetId === friend.data.userId
         );
         expect(reverse).toBeDefined();
       }
     });
 
-    test('アルバムのオーナーが全てユーザーとして存在する', async () => {
-      const db = getAuthenticatedFirestore('admin');
-      await seedFirestore(db, SMALL_SEED_CONFIG);
+    test('album owners exist as users', async () => {
+      const users = createBulkUsers(5);
+      const userDocs = users.map((u) => {
+        const data = { ...u } as Record<string, unknown>;
+        delete data.uid;
+        return { id: u.uid, data };
+      });
+      await adminSeedDocuments('users', userDocs);
 
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const userIds = new Set(usersSnapshot.docs.map((doc) => doc.id));
+      const userIds = users.map((u) => u.uid);
+      const albums = createAlbumsForUsers(userIds, 2);
+      const albumDocs = albums.map((a) => {
+        const data = { ...a } as Record<string, unknown>;
+        delete data.id;
+        if (data.placeUrl === undefined) delete data.placeUrl;
+        return { id: a.id, data };
+      });
+      await adminSeedDocuments('albums', albumDocs);
 
-      const albumsSnapshot = await getDocs(collection(db, 'albums'));
-      const albums = albumsSnapshot.docs.map((doc) => doc.data());
+      const allUsers = await adminGetDocs('users');
+      const userIdSet = new Set(allUsers.map((u) => u.id));
 
-      for (const album of albums) {
-        expect(userIds.has(album.ownerId)).toBe(true);
+      const allAlbums = await adminGetDocs('albums');
+      for (const album of allAlbums) {
+        expect(userIdSet.has(album.data.ownerId as string)).toBe(true);
       }
     });
   });

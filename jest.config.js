@@ -22,6 +22,8 @@ const customJestConfig = {
     '<rootDir>/**/__tests__/**/*.(test|spec).(ts|tsx|js|jsx)',
     '<rootDir>/**/*.(test|spec).(ts|tsx|js|jsx)'
   ],
+  // test/integration は別プロジェクトで処理するため除外
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/test/integration/'],
   transform: {},
 };
 
