@@ -51,13 +51,29 @@ export default function GallerySection(props: GallerySectionProps) {
   const lgRef = useRef<any>(null);
   
   const visiblePhotos = useMemo(() => photos.slice(0, visibleCount), [photos, visibleCount]);
+
+  // LightGalleryのsubHtml用にHTMLを生成
+  const buildSubHtml = (p: PhotoItem): string | undefined => {
+    const iconUrl = p.uploaderIconURL || '/default-avatar.png';
+    const name = p.uploaderHandle || '投稿者';
+    const dateStr = formatCreatedAt(p.createdAt);
+    
+    // アイコン + 名前 + 日時を横並びで表示
+    return `
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 0;">
+        <img src="${iconUrl}" alt="" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />
+        <span style="font-size: 14px; color: #fff;">${name}</span>
+        <span style="font-size: 12px; color: #fff;">${dateStr}</span>
+      </div>
+    `;
+  };
   
   const dynamicEl = useMemo(
     () =>
       visiblePhotos.map((p) => ({
         src: p.src,
         thumb: p.thumbSrc || p.src,
-        subHtml: p.subHtml ?? (p.alt ? `<p>${p.alt}</p>` : undefined),
+        subHtml: buildSubHtml(p),
       })),
     [visiblePhotos]
   );
