@@ -5,7 +5,9 @@
 @import "lightgallery/css/lg-zoom.css";
 @import "lightgallery/css/lg-thumbnail.css";
 
-:root {
+/* ダークモード（デフォルト） */
+:root,
+:root.theme-dark {
   --background: #000000;
   --foreground: #dfdfdf;
   --border: #494b50; /* 境界線 (gray-400 相当) */
@@ -16,6 +18,22 @@
   /* Feature accents */
   --watch: #0ea5e9; /* sky-500 */
   --friend: #f97316; /* orange-500 */
+  --surface-weak: #484848;
+}
+
+/* ライトモード */
+:root.theme-light {
+  --background: #ffffff;
+  --foreground: #1f2937; /* gray-800 */
+  --border: #d1d5db; /* gray-300 */
+  --muted: #6b7280; /* gray-500 */
+  --accent: #0d9488; /* teal-600 */
+  --accent-hover: #0f766e; /* teal-700 */
+  --accent-fg: #ffffff;
+  /* Feature accents */
+  --watch: #0ea5e9; /* sky-500 */
+  --friend: #f97316; /* orange-500 */
+  --surface-weak: #f3f4f6; /* gray-100 */
 }
 
 /* スクロールバー出現/消失による横ズレ（特にWindows）を防ぐ */
@@ -29,7 +47,7 @@ html {
   --color-foreground: var(--foreground);
   --color-line: var(--border);
   --color-muted: var(--muted);
-  --color-surface-weak: #484848;
+  --color-surface-weak: var(--surface-weak);
   /* Feature accents (tokens) */
   --color-watch: var(--watch);
   --color-friend: var(--friend);

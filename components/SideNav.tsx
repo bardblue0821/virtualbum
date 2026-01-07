@@ -192,6 +192,19 @@ function SideNavInner() {
         </button>
         {menuOpen && (
           <div ref={menuRef} className="absolute bottom-14 left-0 z-50 bg-background border border-line rounded-md shadow-md min-w-40 p-2">
+            {/* テーマ切り替え */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              fullWidth
+              className="border-0 bg-transparent hover:bg-transparent justify-start"
+              onClick={() => {
+                toggleTheme();
+              }}
+            >
+              {currentTheme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード'}
+            </Button>
             {user && (
               <Button
                 type="button"
