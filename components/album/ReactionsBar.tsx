@@ -65,7 +65,8 @@ export default function ReactionsBar(props: ReactionsBarProps) {
                 aria-label={`リアクション ${r.emoji}`}
                 aria-pressed={mine}
                 onClick={() => onPickEmoji(r.emoji)}
-                className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page fg-muted"}`}
+                className="rounded border px-2 py-1 text-sm bg-page"
+                style={mine ? { borderColor: "var(--accent)", color: "var(--accent)" } : { borderColor: "var(--border)" }}
               >{r.emoji} <span className="text-xs">{count}</span></button>
               {hoveredEmoji === r.emoji && (
                 <ReactorPopover emoji={r.emoji} users={reactorMap[r.emoji]} loading={reactorLoading[r.emoji]} />
