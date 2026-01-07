@@ -14,6 +14,14 @@ interface CommentFormProps {
 export function CommentForm({ value, onChange, onSubmit, maxLength = 200, busy = false, disabled = false }: CommentFormProps) {
   const remaining = maxLength - value.length;
   const isSubmitDisabled = !value.trim() || busy || disabled;
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !isSubmitDisabled) {
+      e.preventDefault();
+      onSubmit();
+    }
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -26,9 +34,10 @@ export function CommentForm({ value, onChange, onSubmit, maxLength = 200, busy =
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         maxLength={maxLength}
         rows={3}
-        placeholder="コメントを入力"
+        placeholder="コメントを入力（Ctrl+Enterで送信）"
         disabled={busy || disabled}
         className="w-full rounded border border-base bg-page px-3 py-2 text-sm placeholder:text-(--subtle) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent-ring)"
         aria-label="コメント入力"

@@ -129,8 +129,14 @@ export function TimelineItem(props: TimelineItemProps) {
             aria-label="コメント入力"
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && text.trim() && !busy && !submitting) {
+                e.preventDefault();
+                handleCommentSubmit();
+              }
+            }}
             className="flex-1 input-underline text-sm"
-            placeholder="コメントを書く"
+            placeholder="コメントを書く（Ctrl+Enterで送信）"
           />
           <Button
             type="button"
@@ -202,7 +208,7 @@ function Header({
       {/* オーナー情報 */}
       <div className="flex items-center gap-3">
         <a href={`/user/${owner?.handle || album.ownerId}`} className="shrink-0" aria-label="プロフィールへ">
-          <Avatar src={owner?.iconURL || undefined} size={48} interactive={false} withBorder={false} className="rounded-full" />
+          <Avatar src={owner?.iconURL || undefined} size={56} interactive={false} withBorder={false} className="rounded-full" />
         </a>
         <div className="min-w-0">
           <a
