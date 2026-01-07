@@ -3,7 +3,7 @@
  * テスト用画像データを生成
  */
 
-import type { AlbumImageDoc } from '../../types/models';
+import type { AlbumImageDoc } from '@/src/types/firestore';
 import {
   randomId,
   sequentialId,

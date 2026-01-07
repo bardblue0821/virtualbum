@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useAuthUser } from '../../../lib/hooks/useAuthUser';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
 import { getUserByHandle, updateUser } from '../../../lib/repos/userRepo';
 import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
@@ -11,7 +11,7 @@ import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, 
 import { isWatched, addWatch, removeWatch, listWatchers } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
 import { useToast } from '../../../components/ui/Toast';
-import { deleteAccountData } from '../../../lib/services/deleteAccount';
+import { deleteAccountData } from '@/src/services/deleteAccount';
 import { auth } from '../../../lib/firebase';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider, reauthenticateWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import Avatar from '../../../components/profile/Avatar';

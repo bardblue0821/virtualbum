@@ -7,9 +7,9 @@ import { useToast } from "../ui/Toast";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { canUploadMoreImages } from "@/lib/repos/imageRepo";
-import { useAuthUser } from "@/lib/hooks/useAuthUser";
+import { useAuthUser } from "@/src/hooks/useAuthUser";
 import AlbumImageCropper from "./AlbumImageCropper";
-import { getCroppedBlobSized } from "@/lib/services/avatar";
+import { getCroppedBlobSized } from "@/src/services/avatar";
 
 type ItemState = {
   file: File;

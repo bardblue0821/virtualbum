@@ -1,9 +1,9 @@
 "use client";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuthUser } from '../lib/hooks/useAuthUser';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
 import { getUser } from '../lib/repos/userRepo';
-import { useNotificationsBadge } from '../lib/hooks/useNotificationsBadge';
+import { useNotificationsBadge } from '@/src/hooks/useNotificationsBadge';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import React, { useState, useEffect, useRef } from 'react';

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { updateUser } from '@/lib/repos/userRepo';
 import { buildProfilePatch } from '@/src/services/profile/buildPatch';
 import { useToast } from '@/components/ui/Toast';
-import type { UserDoc } from '@/types/models';
+import type { UserDoc } from '@/src/types/firestore';
 
 export interface UseProfileEditResult {
   // Edit state

@@ -1,6 +1,6 @@
-import { db } from '../firebase'
+import { db } from '@/lib/firebase'
 import { collection, deleteDoc, doc, getDocs, limit, query, where, writeBatch } from 'firebase/firestore'
-import { COL } from '../paths'
+import { COL } from '@/lib/paths'
 
 type ProgressCb = (step: string, deleted: number) => void
 

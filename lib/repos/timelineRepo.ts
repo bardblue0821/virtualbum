@@ -1,7 +1,7 @@
 import { db } from '../firebase';
 import { COL } from '../paths';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import type { AlbumDoc } from '../../types/models';
+import type { AlbumDoc } from '@/src/types/firestore';
 
 // ownerIds が指定されない場合は最新アルバム全体（暫定）
 // NOTE: ownerIds 絞り込みは "in + orderBy" の複合インデックス問題を避けるため、

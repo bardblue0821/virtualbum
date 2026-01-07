@@ -1,7 +1,7 @@
 import { db } from '../firebase';
 import { COL } from '../paths';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
-import type { FriendDoc } from '../../types/models';
+import type { FriendDoc } from '@/src/types/firestore';
 import { AppError, ErrorHelpers } from '../errors/ErrorHandler';
 
 // ドキュメントID: userId_targetId （申請方向）

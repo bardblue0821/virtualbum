@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useAuthUser } from "../hooks/useAuthUser";
+import { useAuthUser } from "./useAuthUser";
 
 /**
  * 未ログイン or 未検証ユーザーをトップ（/）へ誘導するクライアントガード。

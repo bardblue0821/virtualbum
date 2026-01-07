@@ -11,7 +11,7 @@ import type {
   FriendDoc,
   WatchDoc,
   FriendStatus,
-} from '../../types/models';
+} from '@/src/types/firestore';
 import {
   randomId,
   sequentialId,

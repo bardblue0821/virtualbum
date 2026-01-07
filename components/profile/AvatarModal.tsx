@@ -4,7 +4,7 @@ import { storage } from '../../lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AvatarCropper from './AvatarCropper';
 import { Button, IconButton } from "../ui/Button";
-import { getCroppedBlob } from '../../lib/services/avatar';
+import { getCroppedBlob } from '@/src/services/avatar';
 import { updateUserIcon } from '../../lib/repos/userRepo';
 
 interface Props {

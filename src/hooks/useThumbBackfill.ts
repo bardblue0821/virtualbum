@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { storage } from "../../lib/firebase";
+import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { setThumbUrl } from "../../lib/repos/imageRepo";
+import { setThumbUrl } from "@/lib/repos/imageRepo";
 
 /**
  * 既存画像の thumbUrl が無いものに対して、軽量サムネイルをバックグラウンド生成して登録する。

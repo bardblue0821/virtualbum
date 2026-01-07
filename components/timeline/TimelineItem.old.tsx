@@ -14,7 +14,7 @@ import { RepostIcon } from "../icons/RepostIcon";
 import AlbumActionsMenu from "../album/AlbumActionsMenu";
 import ShareMenu from "../album/ShareMenu";
 import { getOptimizedImageUrl } from "../../lib/utils/imageUrl";
-import { useTimelineItemVisibility } from "../../lib/hooks/useTimelineItemVisibility";
+import { useTimelineItemVisibility } from "@/src/hooks/useTimelineItemVisibility";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;

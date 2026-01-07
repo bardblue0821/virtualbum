@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { subscribeNotifications } from '../repos/notificationRepo';
+import { subscribeNotifications } from '@/lib/repos/notificationRepo';
 import { useAuthUser } from './useAuthUser';
 
 export function useNotificationsBadge(){

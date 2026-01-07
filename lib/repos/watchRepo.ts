@@ -1,7 +1,7 @@
 import { db } from '../firebase';
 import { COL } from '../paths';
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import type { WatchDoc } from '../../types/models';
+import type { WatchDoc } from '@/src/types/firestore';
 
 function watchId(userId: string, ownerId: string) {
   return `${userId}_${ownerId}`; // userId が watcher

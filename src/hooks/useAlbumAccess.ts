@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getFriendStatus } from "../../lib/repos/friendRepo";
-import { isWatched } from "../../lib/repos/watchRepo";
+import { getFriendStatus } from "@/lib/repos/friendRepo";
+import { isWatched } from "@/lib/repos/watchRepo";
 
 /**
  * 判定: 現在のユーザーがアルバムオーナーに対してフレンド/ウォッチャーかどうか。

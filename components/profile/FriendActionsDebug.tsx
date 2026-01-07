@@ -1,7 +1,7 @@
 // デバッグ用の一時ファイル（確認後は削除してください）
 // components/profile/FriendActionsDebug.tsx
 "use client";
-import { useFriendship } from '@/lib/hooks/useFriendship';
+import { useFriendship } from '@/src/hooks/useFriendship';
 import { useEffect } from 'react';
 
 export function FriendActionsDebug({ viewerUid, profileUid }: { viewerUid: string | null; profileUid: string }) {

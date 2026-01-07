@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from "../repos/friendRepo";
-import { translateError } from "../errors";
+import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from "@/lib/repos/friendRepo";
+import { translateError } from "@/lib/errors";
 import { useAsyncOperation } from "./useAsyncOperation";
 
 export type FriendState = "none" | "sent" | "received" | "accepted";

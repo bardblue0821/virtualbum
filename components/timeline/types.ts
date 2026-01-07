@@ -68,6 +68,7 @@ export interface TimelineItemProps {
   onRequestDelete?: (albumId: string) => void;
   onRequestReport?: (albumId: string) => void;
   commentCount?: number;
+  latestComment?: { body: string; userId: string };
   commentsPreview?: CommentPreviewData[];
   onCommentSubmit?: (text: string) => Promise<void>;
   submitting?: boolean;

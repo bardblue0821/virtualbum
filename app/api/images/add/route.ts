@@ -1,10 +1,7 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { canUploadMoreImages } from '@/lib/repos/imageRepo';
-import { adminAddImage } from '@/src/repositories/admin/firestore';
-import { getAlbumSafe } from '@/lib/repos/albumRepo';
-import { getFriendStatus } from '@/lib/repos/friendRepo';
+import { adminCanUploadMoreImages, adminAddImage, adminGetFriendStatus, adminGetAlbum } from '@/src/repositories/admin/firestore';
 import { verifyIdToken } from '@/src/libs/firebaseAdmin';
 
 // simple rate limit per IP: 10 req / 60s
@@ -52,14 +49,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const album = await getAlbumSafe(albumId);
+    const album = await adminGetAlbum(albumId);
     if (!album) return NextResponse.json({ error: 'ALBUM_NOT_FOUND' }, { status: 404 });
     const isOwner = album.ownerId === userId;
     let isFriend = false;
     try {
       const [forward, backward] = await Promise.all([
-        getFriendStatus(userId, album.ownerId),
-        getFriendStatus(album.ownerId, userId),
+        adminGetFriendStatus(userId, album.ownerId),
+        adminGetFriendStatus(album.ownerId, userId),
       ]);
       isFriend = (forward === 'accepted') || (backward === 'accepted');
     } catch {}
@@ -68,7 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'NO_PERMISSION' }, { status: 403 });
     }
 
-    const allow = await canUploadMoreImages(albumId, userId);
+    const allow = await adminCanUploadMoreImages(albumId, userId);
     if (!allow) {
       return NextResponse.json({ error: 'LIMIT_EXCEEDED' }, { status: 400 });
     }

@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect } from 'react';
-import { useAuthUser } from '../lib/hooks/useAuthUser';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
 import { usePathname, useRouter } from 'next/navigation';
 
 export function AuthGate({ children }: { children: React.ReactNode }) {

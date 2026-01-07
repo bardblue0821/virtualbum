@@ -4,7 +4,7 @@ import Avatar from "../profile/Avatar";
 import { Button } from "../ui/Button";
 import AlbumActionsMenu from "../album/AlbumActionsMenu";
 import ShareMenu from "../album/ShareMenu";
-import { useTimelineItemVisibility } from "../../lib/hooks/useTimelineItemVisibility";
+import { useTimelineItemVisibility } from "@/src/hooks/useTimelineItemVisibility";
 
 // サブコンポーネント
 import { ImageGrid } from "./ImageGrid";

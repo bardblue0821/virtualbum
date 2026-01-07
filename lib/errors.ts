@@ -1,4 +1,4 @@
-import { ERR } from '../types/models';
+import { ERR } from '@/src/types/firestore';
 
 // アプリ内統一メッセージ（必要に応じて i18n 切替想定）
 const messages: Record<string, string> = {

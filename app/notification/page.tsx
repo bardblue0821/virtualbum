@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { useAuthUser } from '../../lib/hooks/useAuthUser';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
 import { listNotifications, markAllRead, subscribeNotifications } from '../../lib/repos/notificationRepo';
 import { getUser } from '../../lib/repos/userRepo';
 import { getFriendStatus, acceptFriend, cancelFriendRequest } from '../../lib/repos/friendRepo';

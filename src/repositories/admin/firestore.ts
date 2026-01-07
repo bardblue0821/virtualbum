@@ -113,3 +113,36 @@ export async function adminGetFriendStatus(userId: string, targetId: string): Pr
     return 'none';
   }
 }
+
+/**
+ * Admin SDK を使ってアルバムを取得
+ */
+export async function adminGetAlbum(albumId: string): Promise<{ id: string; ownerId: string; visibility?: string; [k: string]: any } | null> {
+  try {
+    const db = getAdminDb();
+    const snap = await db.collection(COL.albums).doc(albumId).get();
+    if (!snap.exists) return null;
+    return { id: snap.id, ...(snap.data() as any) };
+  } catch (e) {
+    log.error('adminGetAlbum error:', e);
+    return null;
+  }
+}
+
+/**
+ * Admin SDK を使ってユーザーが追加画像をアップロードできるかチェック
+ * 1アルバムにつきユーザー毎4枚まで
+ */
+export async function adminCanUploadMoreImages(albumId: string, userId: string): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    const snap = await db.collection(COL.albumImages)
+      .where('albumId', '==', albumId)
+      .where('uploaderId', '==', userId)
+      .get();
+    return snap.size < 4;
+  } catch (e) {
+    log.error('adminCanUploadMoreImages error:', e);
+    return false;
+  }
+}

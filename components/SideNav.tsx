@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAuthUser } from '@/lib/hooks/useAuthUser';
-import { useNotificationsBadge } from '@/lib/hooks/useNotificationsBadge';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
+import { useNotificationsBadge } from '@/src/hooks/useNotificationsBadge';
 import { getUser } from '@/lib/repos/userRepo';
 import Avatar from '@/components/profile/Avatar';
 import React from 'react';

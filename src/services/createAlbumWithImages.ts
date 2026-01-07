@@ -1,9 +1,9 @@
-import { db, storage } from '../../lib/firebase';
-import { COL } from '../../lib/paths';
+import { db, storage } from '@/lib/firebase';
+import { COL } from '@/lib/paths';
 import { doc, setDoc, collection, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { addImage, canUploadMoreImages } from '../repos/imageRepo';
-import { addComment } from '../repos/commentRepo';
+import { addImage, canUploadMoreImages } from '@/lib/repos/imageRepo';
+import { addComment } from '@/lib/repos/commentRepo';
 
 interface CreateAlbumOptions { title?: string; placeUrl?: string; firstComment?: string; visibility?: 'public' | 'friends' }
 export interface AlbumCreateProgress {

@@ -1,66 +1,29 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { type PhotoItem } from "@/components/gallery/GalleryGrid";
 import AlbumHeader from "@/components/album/AlbumHeader";
 import ReactionsBar from "@/components/album/ReactionsBar";
 import GallerySection from "@/components/album/GallerySection";
 import CommentsSection from "@/components/album/CommentsSection";
 import DeleteConfirmModal from "@/components/album/DeleteConfirmModal";
-import { useParams, useRouter } from "next/navigation";
-import { useAuthUser } from "../../../lib/hooks/useAuthUser";
-import {
-  listImages,
-  deleteImage,
-  canUploadMoreImages,
-} from "../../../lib/repos/imageRepo";
-import {
-  addComment,
-  updateComment,
-  deleteComment,
-} from "../../../lib/repos/commentRepo";
-import { updateAlbum, getAlbumSafe, deleteAlbum } from "../../../lib/repos/albumRepo";
-import { getUser } from "../../../lib/repos/userRepo";
-import {
-  toggleLike,
-  hasLiked,
-  countLikes,
-  subscribeLikes,
-} from "../../../lib/repos/likeRepo";
-import { translateError } from "../../../lib/errors";
-import { isRateLimitError } from "../../../lib/rateLimit";
-import { CommentList } from "../../../components/comments/CommentList";
-import { listComments, subscribeComments } from "../../../lib/repos/commentRepo";
-import { CommentForm } from "../../../components/comments/CommentForm";
-import { ERR } from "../../../types/models";
-import { listReactionsByAlbum, toggleReaction, listReactorsByAlbumEmoji, Reactor } from "../../../lib/repos/reactionRepo";
-import { useToast } from "../../../components/ui/Toast";
-// サムネイル自動生成・アクセス判定のフックへ分離
+import Avatar from "@/components/profile/Avatar";
+import { useAuthUser } from "@/src/hooks/useAuthUser";
+import { useToast } from "@/components/ui/Toast";
 import { useThumbBackfill } from "@/src/hooks/useThumbBackfill";
 import { useAlbumAccess } from "@/src/hooks/useAlbumAccess";
-import { addNotification } from "../../../lib/repos/notificationRepo";
-import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
-import Avatar from "../../../components/profile/Avatar";
-// アクセス判定はフックで実施
-// いいねアイコンは ReactionsBar 内で使用
-import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
-import type { AlbumDetailVM, UserRef } from "@/src/models/album";
-import { batchGetUsers } from "../../../lib/utils/batchQuery";
+import { REACTION_CATEGORIES } from "@/lib/constants/reactions";
+import { listImages } from "@/lib/repos/imageRepo";
 
-type CommentRecord = {
-  id: string;
-  body: string;
-  userId: string;
-  createdAt?: any;
-  [key: string]: any;
-};
-
-type AlbumRecord = {
-  id: string;
-  ownerId: string;
-  title?: string;
-  placeUrl?: string;
-  [key: string]: any;
-};
+// 分割したカスタムフック
+import {
+  useAlbumData,
+  useLikes,
+  useReactions,
+  useComments,
+  useAlbumEdit,
+  useImageActions,
+} from "./hooks";
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -69,622 +32,129 @@ export default function AlbumDetailPage() {
   const router = useRouter();
   const toast = useToast();
 
-  const [album, setAlbum] = useState<AlbumRecord | null>(null);
-  const [images, setImages] = useState<any[]>([]);
-  const [comments, setComments] = useState<CommentRecord[]>([]);
-  const [editTitle, setEditTitle] = useState("");
-  const [editPlaceUrl, setEditPlaceUrl] = useState("");
-  const [savingAlbum, setSavingAlbum] = useState(false);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentBody, setEditingCommentBody] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [commenting, setCommenting] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [liked, setLiked] = useState(false);
-  const [likeBusy, setLikeBusy] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteImageConfirm, setShowDeleteImageConfirm] = useState(false);
-  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
-  const [deletingImage, setDeletingImage] = useState(false);
-  const [showDeleteLastImageModal, setShowDeleteLastImageModal] = useState(false);
-  const [deletingLastImageId, setDeletingLastImageId] = useState<string | null>(null);
-  const [reactions, setReactions] = useState<{ emoji: string; count: number; mine: boolean }[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [emojiQuery, setEmojiQuery] = useState("");
-  const [activeCat, setActiveCat] = useState(REACTION_CATEGORIES[0]?.key || 'faces');
-  const pickerRef = useRef<HTMLDivElement | null>(null);
-  const pickerBtnRef = useRef<HTMLButtonElement | null>(null);
-  const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
-  const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
-  const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
-  const filteredEmojis = useMemo(() => filterReactionEmojis(emojiQuery), [emojiQuery]);
-  const categoryEmojis = useMemo(() => {
-    const cat = REACTION_CATEGORIES.find(c => c.key === activeCat);
-    return cat ? cat.emojis : [];
-  }, [activeCat]);
-  // 一覧の初期表示件数（早期 return より前に hook を宣言しておく）
-  const [visibleCount, setVisibleCount] = useState(16);
-  // 画像の投稿者（アイコン表示用）キャッシュ
-  const [uploaderMap, setUploaderMap] = useState<Record<string, { iconURL: string | null; handle: string | null }>>({});
-  // アクセス権限（フックに分離）
+  // window に getIdToken を公開（フック内から利用）
+  useEffect(() => {
+    if (user) {
+      (window as any).__getIdToken = () => user.getIdToken();
+    }
+    return () => {
+      delete (window as any).__getIdToken;
+    };
+  }, [user]);
+
+  // ========================================
+  // 分割したフックを使用
+  // ========================================
+  
+  // データ取得
+  const {
+    album,
+    setAlbum,
+    images,
+    setImages,
+    comments,
+    reactions,
+    setReactions,
+    uploaderMap,
+    loading,
+    error,
+    setError,
+  } = useAlbumData(albumId, user?.uid);
+
+  // 権限判定
+  const isOwner = !!(user && album?.ownerId === user.uid);
   const { isFriend, isWatcher } = useAlbumAccess(album?.ownerId, user?.uid);
+  const isPrivate = album?.visibility === 'friends';
 
-  useEffect(() => {
-    if (!albumId) return;
+  // いいね
+  const { likeCount, liked, likeBusy, handleToggleLike } = useLikes(
+    albumId,
+    user?.uid,
+    setError
+  );
 
-    let cancelled = false;
-    let unsubComments: (() => void) | undefined;
+  // リアクション
+  const {
+    pickerOpen,
+    setPickerOpen,
+    emojiQuery,
+    setEmojiQuery,
+    activeCat,
+    setActiveCat,
+    filteredEmojis,
+    categoryEmojis,
+    hoveredEmoji,
+    reactorMap,
+    reactorLoading,
+    pickerRef,
+    pickerBtnRef,
+    handleToggleReaction,
+    onChipEnter,
+    onChipLeave,
+  } = useReactions(albumId, user?.uid, album, reactions, setReactions, setError, toast);
 
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log('[AlbumDetail] Loading album:', albumId, 'user:', user?.uid);
-        const userCache = new Map<string, UserRef | null>();
-        const vm = await getAlbumDetailVM(albumId, user?.uid, userCache);
-        console.log('[AlbumDetail] VM result:', vm ? 'found' : 'null', vm);
-        if (!vm) {
-          if (!cancelled) {
-            setAlbum(null);
-            setImages([]);
-            setComments([]);
-            setError("アルバムが見つかりません");
-          }
-          return;
-        }
-        if (cancelled) return;
-        setAlbum(vm.album as any);
-        setEditTitle(vm.album.title ?? "");
-        setEditPlaceUrl(vm.album.placeUrl ?? "");
-        setImages(vm.images as any[]);
-        setComments(vm.commentsAsc as CommentRecord[]);
-  setReactions(vm.reactions);
+  // コメント
+  const {
+    editingCommentId,
+    editingCommentBody,
+    commentText,
+    commenting,
+    setCommentText,
+    beginEditComment,
+    cancelEditComment,
+    saveEditComment,
+    handleDeleteComment,
+    submitComment,
+  } = useComments(albumId, user?.uid, comments, isOwner, isFriend, isWatcher, isPrivate, setError, toast);
 
-        unsubComments = await subscribeComments(
-          albumId,
-          (snapshotList) => {
-            if (cancelled) return;
-            const list = [...snapshotList].sort(
-              (a, b) =>
-                (a.createdAt?.seconds || a.createdAt || 0) -
-                (b.createdAt?.seconds || b.createdAt || 0),
-            );
-            setComments(list as CommentRecord[]);
-          },
-          (err) => console.warn("comments subscribe error", err),
-        );
-        // リアクションは VM セット済み（購読は個別に必要なら後で実装）
-      } catch (e: any) {
-        if (!cancelled) {
-          setError(translateError(e));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
+  // アルバム編集
+  const {
+    editTitle,
+    editPlaceUrl,
+    savingAlbum,
+    showDeleteConfirm,
+    deleting,
+    setEditTitle,
+    setEditPlaceUrl,
+    handleChangeVisibility,
+    saveTitleIfChanged,
+    savePlaceUrlIfChanged,
+    handleInputKeyDownBlurOnEnter,
+    askDeleteAlbum,
+    confirmDeleteAlbum,
+    setShowDeleteConfirm,
+  } = useAlbumEdit(albumId, album, setAlbum, setError, toast, router);
 
-    return () => {
-      cancelled = true;
-      if (unsubComments) unsubComments();
-    };
-  }, [albumId, user?.uid]);  // user?.uid を依存配列に追加
+  // 画像操作
+  const {
+    showDeleteImageConfirm,
+    deletingImage,
+    showDeleteLastImageModal,
+    askDeleteImage,
+    confirmDeleteImage,
+    confirmDeleteLastImageWithAlbum,
+    cancelDeleteLastImage,
+    setShowDeleteImageConfirm,
+    setDeletingImageId,
+  } = useImageActions(albumId, user?.uid, images, setImages, isOwner, isFriend, setError, router);
 
-  useEffect(() => {
-    if (!albumId) return;
+  // 表示件数
+  const [visibleCount, setVisibleCount] = useState(16);
 
-    let cancelled = false;
-    let unsubLikes: (() => void) | undefined;
-
-    (async () => {
-      try {
-        // 初期値はクエリで即時反映
-        const cnt = await countLikes(albumId);
-        if (!cancelled) setLikeCount(cnt);
-        if (user?.uid) {
-          const likedFlag = await hasLiked(albumId, user.uid);
-          if (!cancelled) setLiked(likedFlag);
-        } else {
-          if (!cancelled) setLiked(false);
-        }
-      } catch (e: any) {
-        if (!cancelled) setError(translateError(e));
-      }
-      // リアルタイム購読で常に同期
-      try {
-        unsubLikes = await subscribeLikes(
-          albumId,
-          (list) => {
-            const cnt2 = list.length;
-            const meLiked = !!(user?.uid && list.some(x => x.userId === user.uid));
-            setLikeCount(cnt2);
-            setLiked(meLiked);
-          },
-          (err) => console.warn("likes subscribe error", err)
-        );
-      } catch (e) {
-        // 購読失敗は致命的ではない
-        console.warn('subscribeLikes failed', e);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (unsubLikes) try { unsubLikes(); } catch {}
-    };
-  }, [albumId, user?.uid]);
-
-  // アクセス権限の判定は useAlbumAccess へ分離
-
-  // 既存画像のサムネイル不足分はフックで自動生成
+  // サムネイル自動生成
   useThumbBackfill(albumId, images, visibleCount, setImages);
 
-  // 投稿者アイコンの取得（バッチクエリで一括取得）
+  // album.title/placeUrl が更新されたら editTitle/editPlaceUrl も更新
   useEffect(() => {
-    const ids = Array.from(new Set(images.map((img) => img.uploaderId).filter(Boolean)));
-    if (ids.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      // ========================================
-      // N+1 問題解決: バッチクエリで一括取得
-      // ========================================
-      try {
-        const batchedUsers = await batchGetUsers(ids);
-        const next: Record<string, { iconURL: string | null; handle: string | null }> = {};
-        
-        ids.forEach((uid) => {
-          const u = batchedUsers.get(uid);
-          next[uid] = { 
-            iconURL: u?.iconURL || null, 
-            handle: u?.handle || null 
-          };
-        });
-        
-        if (!cancelled) setUploaderMap(next);
-      } catch (e) {
-        console.warn('Failed to batch get uploaders', e);
-        // フォールバック: 空のマップをセット
-        if (!cancelled) setUploaderMap({});
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [images]);
-
-  async function handleAddImage() {
-    if (!user || !albumId || !file) return;
-    // 権限チェック: オーナー/フレンドのみ
-    if (!(isOwner || isFriend)) {
-      setError('画像を追加する権限がありません');
-      return;
+    if (album) {
+      setEditTitle(album.title ?? "");
+      setEditPlaceUrl(album.placeUrl ?? "");
     }
-    setUploading(true);
-    setError(null);
-    try {
-      const url = await fileToDataUrl(file);
-      const token = await user.getIdToken();
-      console.log('[album:addImage] uploading image');
-      const res = await fetch('/api/images/add', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
-        body: JSON.stringify({ albumId, userId: user.uid, url }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(()=>({}));
-        console.error('[album:addImage] API error:', data);
-        setError(translateError(data?.error || 'UNKNOWN'));
-        return;
-      }
-      console.log('[album:addImage] upload successful, refreshing image list');
-      
-      // ★ 画像リストを再取得（エラーが発生しても無視）
-      try {
-        const imgs = await listImages(albumId);
-        console.log('[album:addImage] image list refreshed', imgs.length);
-        imgs.sort(
-          (a: any, b: any) =>
-            (b.createdAt?.seconds || b.createdAt || 0) -
-            (a.createdAt?.seconds || a.createdAt || 0),
-        );
-        setImages(imgs);
-        setFile(null);
-        console.log('[album:addImage] complete');
-      } catch (listError: any) {
-        // listImages でエラーが発生してもアップロードは成功しているので無視
-        console.warn('[album:addImage] failed to refresh image list, but upload succeeded:', listError);
-        // 楽観的更新: 新しい画像を手動で追加
-        const newImage = {
-          id: Date.now().toString(), // 仮のID
-          albumId,
-          uploaderId: user.uid,
-          url,
-          createdAt: new Date(),
-        };
-        setImages((prev) => [newImage, ...prev]);
-        setFile(null);
-        // エラーメッセージは表示しない（アップロードは成功）
-      }
-    } catch (e: any) {
-      console.error('[album:addImage] error:', e);
-      setError(translateError(e));
-    } finally {
-      setUploading(false);
-    }
-  }
+  }, [album, setEditTitle, setEditPlaceUrl]);
 
-  // ピッカー外クリック/ESCで閉じる
-  useEffect(() => {
-    if (!pickerOpen) return;
-    function onMouseDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (pickerRef.current && !pickerRef.current.contains(t) && pickerBtnRef.current && !pickerBtnRef.current.contains(t)) {
-        setPickerOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setPickerOpen(false); }
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [pickerOpen]);
-
-  // 開くたびに検索語をクリア
-  useEffect(() => { if (pickerOpen) setEmojiQuery(""); }, [pickerOpen]);
-
-  async function handleToggleLike() {
-    if (!user || !albumId) return;
-    setLikeBusy(true);
-    const prevLiked = liked;
-    const prevCount = likeCount;
-    setLiked(!prevLiked);
-    setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch('/api/likes/toggle', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
-        body: JSON.stringify({ albumId, userId: user.uid }),
-      });
-      if (!res.ok) {
-        await toggleLike(albumId, user.uid);
-      }
-    } catch (e: any) {
-      setLiked(prevLiked);
-      setLikeCount(prevCount);
-      setError(translateError(e));
-    } finally {
-      setLikeBusy(false);
-    }
-  }
-
-  async function handleToggleReaction(emoji: string) {
-    if (!user || !albumId) return;
-    const prev = reactions.slice();
-    // 楽観更新
-    setReactions((cur) => {
-      const idx = cur.findIndex((x) => x.emoji === emoji);
-      if (idx >= 0) {
-        const item = { ...cur[idx] };
-        if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
-        else { item.mine = true; item.count += 1; }
-        const next = cur.slice(); next[idx] = item; return next;
-      } else {
-        return [...cur, { emoji, count: 1, mine: true }];
-      }
-    });
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch('/api/reactions/toggle', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
-        body: JSON.stringify({ albumId, userId: user.uid, emoji }),
-      });
-      let added = false;
-      if (res.ok) {
-        const data = await res.json().catch(()=>({}));
-        added = !!data?.added;
-      } else {
-        const result = await toggleReaction(albumId, user.uid, emoji);
-        added = !!(result as any)?.added;
-      }
-      if (added && album && album.ownerId !== user.uid) {
-        // 通知作成（失敗しても UI には影響させない）
-        addNotification({
-          userId: album.ownerId,
-          actorId: user.uid,
-          type: 'reaction',
-          albumId,
-          message: 'アルバムにリアクション: ' + emoji,
-        }).catch(() => {});
-      }
-    } catch (e:any) {
-      // ロールバック
-      setReactions(prev);
-      if (isRateLimitError(e)) {
-        toast.error(e.message);
-      } else {
-        setError(translateError(e));
-      }
-    }
-  }
-
-  function onChipEnter(emoji: string) {
-    if (!albumId) return;
-    setHoveredEmoji(emoji);
-    if (!reactorMap[emoji] && !reactorLoading[emoji]) {
-      setReactorLoading((s) => ({ ...s, [emoji]: true }));
-      listReactorsByAlbumEmoji(albumId, emoji, 20)
-        .then((list) => setReactorMap((m) => ({ ...m, [emoji]: list })))
-        .catch(() => {})
-        .finally(() => setReactorLoading((s) => ({ ...s, [emoji]: false })));
-    }
-  }
-  function onChipLeave() {
-    setHoveredEmoji(null);
-  }
-
-  function askDeleteImage(id: string) {
-    // 最後の1枚の場合は専用モーダルを表示
-    if (images.length <= 1) {
-      setDeletingLastImageId(id);
-      setShowDeleteLastImageModal(true);
-      return;
-    }
-    
-    setDeletingImageId(id);
-    setShowDeleteImageConfirm(true);
-  }
-
-  async function confirmDeleteImage() {
-    const id = deletingImageId;
-    if (!id) return;
-    
-    setDeletingImage(true);
-    try {
-      // 権限チェック: オーナーは全て、フレンドは自分の画像のみ、ウォッチャー不可
-      const target = images.find((img) => img.id === id);
-      if (!target) return;
-      if (!(isOwner || (isFriend && target.uploaderId === user?.uid))) {
-        setError('この画像を削除する権限がありません');
-        return;
-      }
-      const token = await user!.getIdToken();
-      const res = await fetch('/api/images/delete', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
-        body: JSON.stringify({ albumId, userId: user!.uid, imageId: id }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(()=>({}));
-        setError(translateError(data?.error || 'UNKNOWN'));
-        return;
-      }
-      const imgs = await listImages(albumId!);
-      imgs.sort(
-        (a: any, b: any) =>
-          (b.createdAt?.seconds || b.createdAt || 0) -
-          (a.createdAt?.seconds || a.createdAt || 0),
-      );
-      setImages(imgs);
-      setShowDeleteImageConfirm(false);
-      setDeletingImageId(null);
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setDeletingImage(false);
-    }
-  }
-
-  async function handleSaveAlbum() {
-    if (!albumId) return;
-    setSavingAlbum(true);
-    setError(null);
-    try {
-      await updateAlbum(albumId, { title: editTitle, placeUrl: editPlaceUrl });
-      toast.success("保存しました");
-      const updated = await getAlbumSafe(albumId);
-      if (updated) setAlbum(updated as AlbumRecord);
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setSavingAlbum(false);
-    }
-  }
-
-  async function handleChangeVisibility(v: 'public' | 'friends') {
-    if (!albumId || !album) return;
-    setSavingAlbum(true);
-    setError(null);
-    try {
-      await updateAlbum(albumId, { visibility: v });
-  // 公開→フレンド限定へ切り替え時は既存のリポストを無効化(削除)
-      if (v === 'friends') {
-        try {
-          const { deleteRepostsByAlbum } = await import("../../../lib/repos/repostRepo");
-          await deleteRepostsByAlbum(albumId);
-        } catch (e) {
-          console.warn('deleteRepostsByAlbum failed', e);
-        }
-      }
-      const updated = await getAlbumSafe(albumId);
-      if (updated) setAlbum(updated as AlbumRecord);
-      toast.success("保存しました");
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setSavingAlbum(false);
-    }
-  }
-
-  // 入力フィールドのオートセーブ（フォーカスアウトで保存）
-  async function saveTitleIfChanged() {
-    if (!albumId) return;
-    const current = (album?.title ?? "");
-    const next = (editTitle ?? "").trim();
-    if (next === current) return;
-    setSavingAlbum(true);
-    setError(null);
-    try {
-      await updateAlbum(albumId, { title: next });
-      setAlbum((prev) => (prev ? { ...prev, title: next } : prev));
-      toast.success("保存しました");
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setSavingAlbum(false);
-    }
-  }
-
-  async function savePlaceUrlIfChanged() {
-    if (!albumId) return;
-    const current = (album?.placeUrl ?? "");
-    const next = (editPlaceUrl ?? "").trim();
-    if (next === current) return;
-    setSavingAlbum(true);
-    setError(null);
-    try {
-      await updateAlbum(albumId, { placeUrl: next });
-      setAlbum((prev) => (prev ? { ...prev, placeUrl: next } : prev));
-      toast.success("保存しました");
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setSavingAlbum(false);
-    }
-  }
-
-  function handleInputKeyDownBlurOnEnter(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      (e.currentTarget as HTMLInputElement).blur();
-    }
-  }
-
-  function askDeleteAlbum() {
-    setShowDeleteConfirm(true);
-  }
-
-  async function confirmDeleteAlbum() {
-    if (!albumId || !user) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteAlbum(albumId);
-      // 削除後の遷移（タイムラインへ）
-      try {
-        sessionStorage.setItem(
-          'app:toast',
-          JSON.stringify({ message: 'アルバムを削除しました', variant: 'success', duration: 3000 })
-        );
-      } catch {}
-      // 削除済みページに戻れないよう replace を使用
-      router.replace('/timeline');
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  }
-
-  async function confirmDeleteLastImageWithAlbum() {
-    if (!albumId || !user) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      // アルバムごと削除
-      await deleteAlbum(albumId);
-      // 削除後の遷移（タイムラインへ）
-      try {
-        sessionStorage.setItem(
-          'app:toast',
-          JSON.stringify({ message: 'アルバムを削除しました', variant: 'success', duration: 3000 })
-        );
-      } catch {}
-      router.replace('/timeline');
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setDeleting(false);
-      setShowDeleteLastImageModal(false);
-      setDeletingLastImageId(null);
-    }
-  }
-
-  function cancelDeleteLastImage() {
-    setShowDeleteLastImageModal(false);
-    setDeletingLastImageId(null);
-  }
-
-  function beginEditComment(commentId: string) {
-    const target = comments.find((c) => c.id === commentId);
-    if (!target) return;
-    setEditingCommentId(target.id);
-    setEditingCommentBody(target.body ?? "");
-  }
-
-  function cancelEditComment() {
-    setEditingCommentId(null);
-    setEditingCommentBody("");
-  }
-
-  async function saveEditComment(commentId: string) {
-    if (!commentId || !editingCommentBody.trim()) return;
-    try {
-      await updateComment(commentId, editingCommentBody.trim());
-      cancelEditComment();
-    } catch (e: any) {
-      setError(translateError(e));
-    }
-  }
-
-  async function handleDeleteComment(id: string) {
-    if (!confirm("コメントを削除しますか？")) return;
-    try {
-      await deleteComment(id);
-    } catch (e: any) {
-      setError(translateError(e));
-    }
-  }
-
-  async function submitComment() {
-    if (!user || !albumId || !commentText.trim()) return;
-    if (!(isOwner || isFriend || isWatcher)) {
-      setError('コメントする権限がありません');
-      return;
-    }
-    setCommenting(true);
-    setError(null);
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch('/api/comments/add', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
-        body: JSON.stringify({ albumId, userId: user.uid, body: commentText.trim() }),
-      });
-      if (!res.ok) {
-        await addComment(albumId, user.uid, commentText.trim());
-      }
-      setCommentText("");
-    } catch (e: any) {
-      if (isRateLimitError(e)) {
-        toast.error(e.message);
-      } else {
-        setError(translateError(e));
-      }
-    } finally {
-      setCommenting(false);
-    }
-  }
-
-  // ギャラリー表示用データ（フックはトップレベルで常に実行し、早期returnの前に置く）
+  // ========================================
+  // ギャラリー表示用データ
+  // ========================================
   const photos: PhotoItem[] = useMemo(() => {
     return images.map((img) => ({
       id: img.id,
@@ -699,6 +169,9 @@ export default function AlbumDetailPage() {
     }));
   }, [images, uploaderMap]);
 
+  // ========================================
+  // 早期リターン
+  // ========================================
   if (!albumId) {
     return <div className="text-sm fg-subtle">アルバムIDが指定されていません。</div>;
   }
@@ -713,16 +186,15 @@ export default function AlbumDetailPage() {
     );
   }
 
-  const isOwner = !!(user && album.ownerId === user.uid);
+  // 計算値
   const myCount = images.filter((img) => img.uploaderId === user?.uid).length;
   const remaining = 4 - myCount;
-  // 権限: 画像追加はオーナー/フレンドのみ。コメントはオーナー/フレンド/ウォッチャー。
   const canAddImages = !!user && (isOwner || isFriend);
-  const isPrivate = (album as any)?.visibility === 'friends';
   const canPostComment = !!user && (isOwner || isFriend || (!isPrivate && isWatcher));
-  // タイトル表示（null/空文字の場合は「タイトルなし」）
-  const displayTitle = (album.title && (album.title + '').trim().length > 0) ? (album.title as string) : '無題';
 
+  // ========================================
+  // レンダリング
+  // ========================================
   return (
     <div className="space-y-6">
       <AlbumHeader
@@ -739,7 +211,7 @@ export default function AlbumDetailPage() {
         onVisibilityChange={handleChangeVisibility}
       />
 
-      {/* 参加ユーザーのアイコン一覧（タイトル・URLブロックの下） */}
+      {/* 参加ユーザーのアイコン一覧 */}
       {images.length > 0 && (
         (() => {
           const ids = Array.from(new Set(images.map(img => img.uploaderId).filter(Boolean)));
@@ -779,7 +251,7 @@ export default function AlbumDetailPage() {
         emojiQuery={emojiQuery}
         onEmojiQueryChange={setEmojiQuery}
         activeCat={activeCat}
-  onActiveCatChange={(key) => setActiveCat(key as any)}
+        onActiveCatChange={(key) => setActiveCat(key as any)}
         filteredEmojis={filteredEmojis}
         categoryEmojis={categoryEmojis}
         categories={REACTION_CATEGORIES}
@@ -792,7 +264,6 @@ export default function AlbumDetailPage() {
         visibleCount={visibleCount}
         onSeeMore={() => setVisibleCount((n) => Math.min(images.length, n + 16))}
         canDelete={(p) => {
-          // 削除ボタンは常に表示可能（最後の1枚の場合はアルバム削除モーダルが表示される）
           if (isOwner) return true;
           if (isFriend) return p.uploaderId === user?.uid;
           return false;
@@ -809,7 +280,7 @@ export default function AlbumDetailPage() {
               (b.createdAt?.seconds || b.createdAt || 0) -
               (a.createdAt?.seconds || a.createdAt || 0),
           );
-          setImages(imgs);
+          setImages(imgs as any);
         }}
       />
 
@@ -823,7 +294,7 @@ export default function AlbumDetailPage() {
         commentText={commentText}
         commenting={commenting}
         onEditRequest={beginEditComment}
-        onEditChange={(_, value) => setEditingCommentBody(value)}
+        onEditChange={(_, value) => setCommentText(value)}
         onEditSave={saveEditComment}
         onEditCancel={cancelEditComment}
         onDelete={handleDeleteComment}
@@ -844,7 +315,6 @@ export default function AlbumDetailPage() {
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {/* ログイン必須の注意文は非表示に変更 */}
 
       <DeleteConfirmModal
         open={showDeleteConfirm}
@@ -872,13 +342,4 @@ export default function AlbumDetailPage() {
       />
     </div>
   );
-}
-
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("FILE_READ_ERROR"));
-    reader.readAsDataURL(file);
-  });
 }

@@ -2,10 +2,10 @@ import { db } from '../firebase'
 import { doc, getDoc, setDoc, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore'
 import { COL } from '../paths'
 import { checkRateLimit } from '../rateLimit'
-import type { UserDoc } from '@/types/models'
+import type { UserDoc } from '@/src/types/firestore'
 
 // 型を再エクスポート（後方互換）
-export type { UserDoc } from '@/types/models';
+export type { UserDoc } from '@/src/types/firestore';
 
 export async function getUser(uid: string): Promise<UserDoc | null> {
   const snap = await getDoc(doc(db, COL.users, uid))

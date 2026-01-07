@@ -1,8 +1,8 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthUser } from "../../../lib/hooks/useAuthUser";
-import { useVerificationGuard } from "../../../lib/hooks/useVerificationGuard";
+import { useAuthUser } from "@/src/hooks/useAuthUser";
+import { useVerificationGuard } from "@/src/hooks/useVerificationGuard";
 import { translateError } from "../../../lib/errors";
 import { Button } from "../../../components/ui/Button";
 

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthUser } from "../../lib/hooks/useAuthUser";
+import { useAuthUser } from "@/src/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
 import { listLatestAlbumsVMLimited } from "@/src/services/timeline/listLatestAlbums";
 import type { TimelineItemVM, UserRef } from "@/src/models/timeline";

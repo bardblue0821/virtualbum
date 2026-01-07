@@ -2,7 +2,7 @@
  * プロフィールページのデータ取得とソーシャル機能のフック
  */
 import { useEffect, useRef, useState } from 'react';
-import { useAuthUser } from '@/lib/hooks/useAuthUser';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
 import { getUserByHandle } from '@/lib/repos/userRepo';
 import { listAlbumsByOwner, getAlbum } from '@/lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '@/lib/repos/imageRepo';
@@ -10,7 +10,7 @@ import { listCommentsByUser } from '@/lib/repos/commentRepo';
 import { getFriendStatus, listAcceptedFriends } from '@/lib/repos/friendRepo';
 import { isWatched, listWatchers } from '@/lib/repos/watchRepo';
 import { translateError } from '@/lib/errors';
-import type { UserDoc, AlbumDoc, CommentDoc } from '@/types/models';
+import type { UserDoc, AlbumDoc, CommentDoc } from '@/src/types/firestore';
 
 export type FriendState = 'none' | 'sent' | 'received' | 'accepted';
 

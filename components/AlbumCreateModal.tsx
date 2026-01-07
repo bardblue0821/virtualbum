@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
-import { useAuthUser } from '../lib/hooks/useAuthUser';
-import { createAlbumWithImages, AlbumCreateProgress } from '../lib/services/createAlbumWithImages';
+import { useAuthUser } from '@/src/hooks/useAuthUser';
+import { createAlbumWithImages, AlbumCreateProgress } from '@/src/services/createAlbumWithImages';
 import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
 import { isRateLimitError } from '../lib/rateLimit';
@@ -9,7 +9,7 @@ import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } fr
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { useToast } from './ui/Toast';
 import AlbumImageCropper from './upload/AlbumImageCropper';
-import { getCroppedBlobSized } from '../lib/services/avatar';
+import { getCroppedBlobSized } from '@/src/services/avatar';
 import { Button as AppButton, IconButton as AppIconButton } from './ui/Button';
 
 interface Props { onCreated?: (albumId: string) => void }

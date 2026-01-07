@@ -7,7 +7,7 @@
 
 import { useToast } from '../../components/ui/Toast';
 import { handleError, ErrorHelpers } from '../errors/ErrorHandler';
-import { useAsyncOperation } from '../hooks/useAsyncOperation';
+import { useAsyncOperation } from '@/src/hooks/useAsyncOperation';
 import { sendFriendRequest, acceptFriend, removeFriend } from '../repos/friendRepo';
 import { addWatch, removeWatch } from '../repos/watchRepo';
 

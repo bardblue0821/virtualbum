@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { isWatched, addWatch, removeWatch } from "../repos/watchRepo";
-import { translateError } from "../errors";
+import { isWatched, addWatch, removeWatch } from "@/lib/repos/watchRepo";
+import { translateError } from "@/lib/errors";
 import { useAsyncOperation } from "./useAsyncOperation";
 
 interface Options {
