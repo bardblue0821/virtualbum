@@ -39,10 +39,10 @@ export function CommentForm({ value, onChange, onSubmit, maxLength = 200, busy =
         rows={3}
         placeholder="コメントを入力（Ctrl+Enterで送信）"
         disabled={busy || disabled}
-        className="w-full rounded border border-base bg-page px-3 py-2 text-sm placeholder:text-(--subtle) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent-ring)"
+        className="w-full rounded border border-line bg-page px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:border-[var(--accent)]"
         aria-label="コメント入力"
       />
-      <div className="flex items-center justify-between text-xs fg-subtle">
+      <div className="flex items-center justify-between text-xs text-muted">
         <span>
           {remaining}/{maxLength}
         </span>

@@ -99,7 +99,7 @@ export function CommentList({
         const u = userMap[comment.userId];
         const atName = u?.handle ? `@${u.handle}` : `@${comment.userId.slice(0,6)}`;
         return (
-          <li key={comment.id} className="space-y-2 border-b border-base py-2 text-sm">
+          <li key={comment.id} className="space-y-2 border-b border-line py-2 text-sm">
             {/* ヘッダー: アイコン / ハンドルネーム / ＠ネーム / 時刻 */}
             <div className="flex items-center gap-3">
               {u?.iconURL ? (
@@ -112,9 +112,9 @@ export function CommentList({
               )}
               <div className="min-w-0 flex flex-col gap-0.5">
                 <span className="font-medium text-foreground truncate leading-tight">{u?.displayName || "不明なユーザー"}</span>
-                <span className="text-[11px] fg-muted truncate leading-tight">{atName}</span>
+                <span className="text-[11px] text-muted truncate leading-tight">{atName}</span>
                 {formatTimestamp(comment.createdAt) && (
-                  <span className="text-[11px] fg-muted truncate leading-tight">{formatTimestamp(comment.createdAt)}</span>
+                  <span className="text-[11px] text-muted truncate leading-tight">{formatTimestamp(comment.createdAt)}</span>
                 )}
               </div>
             </div>
