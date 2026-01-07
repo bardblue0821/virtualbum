@@ -50,10 +50,12 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ファイル選択処理（追加型）
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const fileList = e.target.files;
-    if (!fileList || fileList.length === 0) return;
+  const [isDragging, setIsDragging] = useState(false);
+
+  // ファイル追加処理（共通）
+  function addFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
     setError(null);
 
     const remaining = MAX_IMAGES - previews.length;
@@ -63,8 +65,8 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     }
 
     const accepted: { file: File; url: string }[] = [];
-    for (let i = 0; i < Math.min(fileList.length, remaining); i++) {
-      const file = fileList[i];
+    for (let i = 0; i < Math.min(files.length, remaining); i++) {
+      const file = files[i];
       if (!ACCEPTED_TYPES.includes(file.type)) {
         toast.error(`${file.name}: 画像ファイルのみ対応しています`);
         continue;
@@ -81,9 +83,41 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       setCroppedPreviews((prev) => [...prev, ...new Array(accepted.length).fill(null)]);
       setFiles((prev) => [...prev, ...accepted.map((a) => a.file)]);
     }
+  }
 
+  // ファイル選択処理（input経由）
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = e.target.files;
+    if (!fileList) return;
+    addFiles(fileList);
     // inputをリセット（同じファイルを再選択可能に）
     e.target.value = '';
+  }
+
+  // ドラッグ&ドロップ処理
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!loading && user) {
+      setIsDragging(true);
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (loading || !user) return;
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      addFiles(files);
+    }
   }
 
   // 空きマスクリックでファイル選択を開く
@@ -302,8 +336,25 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             disabled={loading || !user}
           />
           
-          {/* 田の字グリッド（2x2） */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* 田の字グリッド（2x2）- ドラッグ&ドロップ対応 */}
+          <div
+            className={`relative grid grid-cols-2 gap-3 p-2 rounded-lg transition-colors ${
+              isDragging 
+                ? 'border-2 border-dashed border-[var(--accent)] bg-[var(--accent)]/10' 
+                : 'border-2 border-transparent'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {/* ドラッグ中のオーバーレイ */}
+            {isDragging && previews.length < MAX_IMAGES && (
+              <div className="col-span-2 absolute inset-0 flex items-center justify-center pointer-events-none z-20 rounded-lg bg-[var(--accent)]/20">
+                <div className="bg-[var(--accent)] text-white px-4 py-2 rounded-lg font-medium shadow-lg">
+                  ここにドロップ
+                </div>
+              </div>
+            )}
             {/* 選択済み画像 */}
             {previews.map((p, idx) => (
               <div
@@ -350,7 +401,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                <span className="text-sm text-muted">画像を選択</span>
+                <span className="text-sm text-muted text-center">クリックまたは<br/>ドラッグ&ドロップ</span>
               </button>
             ))}
           </div>
