@@ -1,20 +1,39 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { searchUsersPrefix, searchAlbumsPrefix, searchAlbumsByCommentPrefix, UserHit, AlbumHit } from "../../lib/repos/searchRepo";
 import { translateError } from "../../lib/errors";
 import Avatar from "@/components/profile/Avatar";
+import { SearchAlbumCard } from "@/components/search/SearchAlbumCard";
+
+const PAGE_SIZE = 20;
 
 export default function SearchPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  
+  // ユーザー検索
   const [users, setUsers] = useState<UserHit[]>([]);
+  const [userLimit, setUserLimit] = useState(PAGE_SIZE);
+  const [userHasMore, setUserHasMore] = useState(false);
+  const [userLoadingMore, setUserLoadingMore] = useState(false);
+  
+  // アルバム検索
   const [albums, setAlbums] = useState<AlbumHit[]>([]);
-  const [suggest, setSuggest] = useState<Array<{ type: "user" | "album"; label: string; href: string }>>([]);
+  const [albumLimit, setAlbumLimit] = useState(PAGE_SIZE);
+  const [albumHasMore, setAlbumHasMore] = useState(false);
+  const [albumLoadingMore, setAlbumLoadingMore] = useState(false);
+  
   const [history, setHistory] = useState<string[]>([]);
   const timer = useRef<number | null>(null);
   const normalized = useMemo(() => q.trim(), [q]);
+  
+  // IntersectionObserver用
+  const userSentinelRef = useRef<HTMLDivElement | null>(null);
+  const albumSentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreUsersRef = useRef<() => void>(() => {});
+  const loadMoreAlbumsRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     // 履歴ロード
@@ -45,36 +64,34 @@ export default function SearchPage() {
   useEffect(() => {
     if (timer.current) window.clearTimeout(timer.current);
     if (!normalized) {
-      setUsers([]); setAlbums([]); setSuggest([]); setErr(null); return;
+      setUsers([]); setAlbums([]); setErr(null);
+      setUserLimit(PAGE_SIZE); setAlbumLimit(PAGE_SIZE);
+      setUserHasMore(false); setAlbumHasMore(false);
+      return;
     }
     const delay = normalized.startsWith("@") ? 120 : 250;
     timer.current = window.setTimeout(async () => {
       const base = normalized.startsWith("@") ? normalized.slice(1) : normalized;
       setLoading(true); setErr(null);
+      // リセット
+      setUserLimit(PAGE_SIZE);
+      setAlbumLimit(PAGE_SIZE);
       try {
         const [u, a, comm] = await Promise.all([
-          searchUsersPrefix(base, 20),
-          searchAlbumsPrefix(base, 20),
-          searchAlbumsByCommentPrefix(base, 20),
+          searchUsersPrefix(base, PAGE_SIZE + 1),
+          searchAlbumsPrefix(base, PAGE_SIZE + 1),
+          searchAlbumsByCommentPrefix(base, PAGE_SIZE + 1),
         ]);
         // アルバム: 本文/説明とコメント由来をマージ
         const byId: Record<string, AlbumHit> = {};
         a.forEach((x) => (byId[x.id] = x));
         comm.forEach((x) => { if (!byId[x.id]) byId[x.id] = x; });
         const albumsMerged = Object.values(byId);
-        setUsers(u);
-        setAlbums(albumsMerged);
-        // サジェスト: 上位5件（ユーザー優先→アルバム）
-        const s: Array<{ type: "user" | "album"; label: string; href: string }> = [];
-        for (const x of u.slice(0, 5)) {
-          const label = `${x.displayName || ""}${x.displayName ? " " : ""}${x.handle ? `@${x.handle}` : ""}`.trim() || x.uid;
-          if (x.handle) s.push({ type: "user", label, href: `/user/${x.handle}` });
-        }
-        for (const x of albumsMerged.slice(0, Math.max(0, 5 - s.length))) {
-          const label = `${x.title || "無題"}`;
-          s.push({ type: "album", label, href: `/album/${x.id}` });
-        }
-        setSuggest(s);
+        
+        setUserHasMore(u.length > PAGE_SIZE);
+        setUsers(u.slice(0, PAGE_SIZE));
+        setAlbumHasMore(albumsMerged.length > PAGE_SIZE);
+        setAlbums(albumsMerged.slice(0, PAGE_SIZE));
       } catch (e: any) {
         setErr(translateError(e));
       } finally {
@@ -86,6 +103,87 @@ export default function SearchPage() {
       if (timer.current) window.clearTimeout(timer.current);
     };
   }, [normalized]);
+
+  // ユーザーをもっと読み込む
+  const loadMoreUsers = useCallback(async () => {
+    if (userLoadingMore || !userHasMore || !normalized) return;
+    const base = normalized.startsWith("@") ? normalized.slice(1) : normalized;
+    setUserLoadingMore(true);
+    try {
+      const nextLimit = userLimit + PAGE_SIZE;
+      const u = await searchUsersPrefix(base, nextLimit + 1);
+      setUserHasMore(u.length > nextLimit);
+      setUsers(u.slice(0, nextLimit));
+      setUserLimit(nextLimit);
+    } catch (e: any) {
+      console.error("loadMoreUsers error:", e);
+    } finally {
+      setUserLoadingMore(false);
+    }
+  }, [userLoadingMore, userHasMore, normalized, userLimit]);
+
+  // アルバムをもっと読み込む
+  const loadMoreAlbums = useCallback(async () => {
+    if (albumLoadingMore || !albumHasMore || !normalized) return;
+    const base = normalized.startsWith("@") ? normalized.slice(1) : normalized;
+    setAlbumLoadingMore(true);
+    try {
+      const nextLimit = albumLimit + PAGE_SIZE;
+      const [a, comm] = await Promise.all([
+        searchAlbumsPrefix(base, nextLimit + 1),
+        searchAlbumsByCommentPrefix(base, nextLimit + 1),
+      ]);
+      const byId: Record<string, AlbumHit> = {};
+      a.forEach((x) => (byId[x.id] = x));
+      comm.forEach((x) => { if (!byId[x.id]) byId[x.id] = x; });
+      const albumsMerged = Object.values(byId);
+      setAlbumHasMore(albumsMerged.length > nextLimit);
+      setAlbums(albumsMerged.slice(0, nextLimit));
+      setAlbumLimit(nextLimit);
+    } catch (e: any) {
+      console.error("loadMoreAlbums error:", e);
+    } finally {
+      setAlbumLoadingMore(false);
+    }
+  }, [albumLoadingMore, albumHasMore, normalized, albumLimit]);
+
+  // refを最新に保つ
+  useEffect(() => {
+    loadMoreUsersRef.current = loadMoreUsers;
+    loadMoreAlbumsRef.current = loadMoreAlbums;
+  }, [loadMoreUsers, loadMoreAlbums]);
+
+  // IntersectionObserver: ユーザー
+  useEffect(() => {
+    const sentinel = userSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreUsersRef.current();
+        }
+      },
+      { rootMargin: "100px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  // IntersectionObserver: アルバム
+  useEffect(() => {
+    const sentinel = albumSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreAlbumsRef.current();
+        }
+      },
+      { rootMargin: "100px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
@@ -130,7 +228,7 @@ export default function SearchPage() {
         {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <section>
           <h2 className="font-medium mb-2">ユーザー {users.length ? `(${users.length})` : ""}</h2>
           {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
@@ -158,21 +256,31 @@ export default function SearchPage() {
               </li>
             ))}
           </ul>
+          {userHasMore && <div ref={userSentinelRef} className="h-4" />}
+          {userLoadingMore && <p className="text-xs fg-subtle mt-1">読み込み中...</p>}
         </section>
 
         <section>
           <h2 className="font-medium mb-2">アルバム {albums.length ? `(${albums.length})` : ""}</h2>
           {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
           {normalized && albums.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
-          <ul className="space-y-1">
+          <div className="divide-y divide-line">
             {albums.map((a) => (
-              <li key={a.id} className="text-sm truncate">
-                <Link href={`/album/${a.id}`}>
-                  {a.title || "無題"}{a.description ? ` — ${a.description}` : ""}
-                </Link>
-              </li>
+              <SearchAlbumCard
+                key={a.id}
+                id={a.id}
+                title={a.title}
+                ownerId={a.ownerId}
+                ownerName={a.ownerName}
+                ownerHandle={a.ownerHandle}
+                ownerIconURL={a.ownerIconURL}
+                createdAt={a.createdAt}
+                firstImageUrl={a.firstImageUrl}
+              />
             ))}
-          </ul>
+          </div>
+          {albumHasMore && <div ref={albumSentinelRef} className="h-4" />}
+          {albumLoadingMore && <p className="text-xs fg-subtle mt-1">読み込み中...</p>}
         </section>
       </div>
     </div>
