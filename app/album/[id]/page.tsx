@@ -240,11 +240,29 @@ export default function AlbumDetailPage() {
       {/* 参加ユーザーのアイコン一覧 */}
       {images.length > 0 && (
         (() => {
+          // ユーザーごとの最後の投稿日時を取得
+          const userLatestMap = new Map<string, number>();
+          for (const img of images) {
+            if (!img.uploaderId) continue;
+            const ts = img.createdAt?.seconds ?? img.createdAt ?? 0;
+            const current = userLatestMap.get(img.uploaderId) ?? 0;
+            if (ts > current) userLatestMap.set(img.uploaderId, ts);
+          }
+          
+          // オーナーを先頭、残りは最終投稿が新しい順にソート
           const ids = Array.from(new Set(images.map(img => img.uploaderId).filter(Boolean)));
+          ids.sort((a, b) => {
+            if (a === album.ownerId) return -1;
+            if (b === album.ownerId) return 1;
+            const tsA = userLatestMap.get(a as string) ?? 0;
+            const tsB = userLatestMap.get(b as string) ?? 0;
+            return tsB - tsA; // 新しい順
+          });
+          
           if (ids.length === 0) return null;
           return (
             <section aria-label="参加ユーザー" className="-mt-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
                 {ids.map((uid) => {
                   const icon = uploaderMap[uid!]?.iconURL || null;
                   const handle = uploaderMap[uid!]?.handle || null;
@@ -252,18 +270,18 @@ export default function AlbumDetailPage() {
                   const isAlbumOwner = uid === album.ownerId;
                   const isMyFriend = myFriendIds.has(uid as string);
                   
-                  // 枠の色: フレンドならオレンジ、それ以外はデフォルト
-                  const borderClass = isMyFriend ? "ring-2 ring-friend" : "";
+                  // 枠の色: フレンドならオレンジ枠、それ以外は枠なし
+                  const borderClass = isMyFriend ? "border-3 border-friend" : "";
                   
                   return (
                     <a key={uid as string} href={href} aria-label="プロフィールへ" className="shrink-0 relative">
                       {/* 王冠マーク（オーナーのみ） */}
                       {isAlbumOwner && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 text-yellow-500 drop-shadow-sm" style={{ fontSize: '14px' }}>
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 text-yellow-500 drop-shadow-sm" style={{ fontSize: '16px' }}>
                           👑
                         </span>
                       )}
-                      <Avatar src={icon || undefined} size={28} interactive={false} withBorder={false} className={`rounded-full ${borderClass}`} />
+                      <Avatar src={icon || undefined} size={40} interactive={false} withBorder={false} className={`rounded-full ${borderClass}`} />
                     </a>
                   );
                 })}
