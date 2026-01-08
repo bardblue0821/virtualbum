@@ -11,6 +11,7 @@ import { countReposts, hasReposted, getRepost, listRepostsByAlbumRaw } from "@/l
 import { getAlbum } from "@/lib/repos/albumRepo";
 import { batchGetUsers } from "@/lib/utils/batchQuery";
 import { createLogger } from "@/lib/logger";
+import { getBlockedUserIds } from "@/lib/repos/blockRepo";
 
 const log = createLogger('timeline:listLatestAlbums');
 
@@ -52,21 +53,26 @@ export async function listLatestAlbumsVMLimited(
   const ownerSet = new Set<string>();
   ownerSet.add(currentUserId);
   const friendOwnerSet = new Set<string>();
+  let blockedUserIds: string[] = [];
   try {
-    const [friends, watched] = await Promise.all([
+    const [friends, watched, blocked] = await Promise.all([
       listAcceptedFriends(currentUserId),
       listWatchedOwnerIds(currentUserId),
+      getBlockedUserIds(currentUserId),
     ]);
+    blockedUserIds = blocked;
     for (const f of friends) {
       const other = f.userId === currentUserId ? f.targetId : f.userId;
       if (other) { ownerSet.add(other); friendOwnerSet.add(other); }
     }
     for (const w of watched) ownerSet.add(w);
   } catch (e) {
-    log.warn("friend/watch fetch error", e);
+    log.warn("friend/watch/block fetch error", e);
   }
 
-  const ownerIds = Array.from(ownerSet);
+  // ブロック済みユーザーを除外
+  const blockedSet = new Set(blockedUserIds);
+  const ownerIds = Array.from(ownerSet).filter((oid) => !blockedSet.has(oid));
   // フレンドでない（ウォッチのみ等）オーナーは公開アルバムのみ取得するように制約
   const publicOnlyOwners = new Set<string>(
     ownerIds.filter((oid) => oid !== currentUserId && !friendOwnerSet.has(oid))

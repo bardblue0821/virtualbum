@@ -31,6 +31,7 @@ export interface LikeDoc { id: string; albumId: string; userId: string; createdA
 export type FriendStatus = 'pending' | 'accepted'
 export interface FriendDoc { id: string; userId: string; targetId: string; status: FriendStatus; createdAt: Date }
 export interface WatchDoc { id: string; userId: string; ownerId: string; createdAt: Date }
+export interface BlockedUserDoc { id: string; blockedAt: Date }
 export interface ReactionDoc { id: string; albumId: string; userId: string; emoji: string; createdAt: Date }
 export interface RepostDoc { id: string; albumId: string; userId: string; createdAt: Date }
 export interface NotificationDoc { 

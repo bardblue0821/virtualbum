@@ -22,6 +22,23 @@ service cloud.firestore {
       );
     }
 
+    // ブロック判定: 自分がotherIdをブロックしているか
+    function isBlocking(otherId) {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/blockedUsers/$(otherId));
+    }
+
+    // ブロック判定: otherIdが自分をブロックしているか
+    function isBlockedBy(otherId) {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(otherId)/blockedUsers/$(request.auth.uid));
+    }
+
+    // 双方向ブロック判定: どちらかがブロックしているか
+    function isEitherBlocking(otherId) {
+      return isBlocking(otherId) || isBlockedBy(otherId);
+    }
+
     // friends 限定アルバムの場合は、オーナーまたはフレンドのみを「可視」とみなす
     function canReadAlbum(albumId) {
       let a = get(/databases/$(database)/documents/albums/$(albumId)).data;
@@ -45,7 +62,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && rid == request.resource.data.albumId + ':' + request.resource.data.userId + ':' + request.resource.data.emoji
         && request.resource.data.keys().hasAll(['albumId','userId','emoji','createdAt'])
-        && canReadAlbum(request.resource.data.albumId);
+        && canReadAlbum(request.resource.data.albumId)
+        && !isBlockedBy(get(/databases/$(database)/documents/albums/$(request.resource.data.albumId)).data.ownerId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
@@ -98,7 +116,8 @@ service cloud.firestore {
         && request.resource.data.body is string
         && request.resource.data.body.size() <= 200
         && request.resource.data.keys().hasAll(['albumId','userId','body','createdAt'])
-        && canReadAlbum(request.resource.data.albumId);
+        && canReadAlbum(request.resource.data.albumId)
+        && !isBlockedBy(get(/databases/$(database)/documents/albums/$(request.resource.data.albumId)).data.ownerId);
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
         && request.resource.data.keys().hasOnly(['albumId','userId','body','createdAt','id'])
@@ -119,7 +138,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && likeId == request.resource.data.albumId + '_' + request.resource.data.userId
         && request.resource.data.keys().hasAll(['albumId','userId','createdAt'])
-        && canReadAlbum(request.resource.data.albumId);
+        && canReadAlbum(request.resource.data.albumId)
+        && !isBlockedBy(get(/databases/$(database)/documents/albums/$(request.resource.data.albumId)).data.ownerId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
@@ -131,7 +151,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && repostId == request.resource.data.albumId + '_' + request.resource.data.userId
         && request.resource.data.keys().hasAll(['albumId','userId','createdAt'])
-        && canReadAlbum(request.resource.data.albumId);
+        && canReadAlbum(request.resource.data.albumId)
+        && !isBlockedBy(get(/databases/$(database)/documents/albums/$(request.resource.data.albumId)).data.ownerId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
@@ -143,7 +164,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && relationId == request.resource.data.userId + '_' + request.resource.data.targetId
         && request.resource.data.status == 'pending'
-        && request.resource.data.keys().hasAll(['id','userId','targetId','status','createdAt']);
+        && request.resource.data.keys().hasAll(['id','userId','targetId','status','createdAt'])
+        && !isEitherBlocking(request.resource.data.targetId);
       allow update: if isSignedIn()
         && resource.data.targetId == request.auth.uid
         && resource.data.status == 'pending'
@@ -157,8 +179,20 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && watchId == request.resource.data.userId + '_' + request.resource.data.ownerId
-        && request.resource.data.keys().hasAll(['id','userId','ownerId','createdAt']);
+        && request.resource.data.keys().hasAll(['id','userId','ownerId','createdAt'])
+        && !isBlockedBy(request.resource.data.ownerId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // blockedUsers/{blockedId} （ユーザーのブロックリスト）
+    match /users/{userId}/blockedUsers/{blockedId} {
+      // 本人のみ読み書き可能
+      allow read: if isUser(userId);
+      allow create: if isUser(userId)
+        && request.resource.data.keys().hasAll(['id','blockedAt'])
+        && request.resource.data.id == blockedId;
+      allow delete: if isUser(userId);
       allow update: if false;
     }
     

@@ -22,6 +22,7 @@ import LinksField from '../../../components/form/LinksField';
 import FriendActions from '../../../components/profile/FriendActions';
 import WatchActions from '../../../components/profile/WatchActions';
 import FriendRemoveConfirmModal from '../../../components/profile/FriendRemoveConfirmModal';
+import BlockButton from '../../../components/user/BlockButton';
 import { buildProfilePatch } from '../../../src/services/profile/buildPatch';
 import { TimelineItem } from '../../../components/timeline/TimelineItem';
 import GalleryGrid, { type PhotoItem } from '../../../components/gallery/GalleryGrid';
@@ -52,6 +53,9 @@ export default function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const [watching, setWatching] = useState(false);
   const [watchBusy, setWatchBusy] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockedByThem, setBlockedByThem] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
 
   // Extra info
   const [ownAlbums, setOwnAlbums] = useState<any[] | null>(null);
@@ -137,6 +141,8 @@ export default function ProfilePage() {
         const p = await getUserByHandle(handleParam);
         if (active) setProfile(p);
         let watchedFlag = false;
+        let blockedFlag = false;
+        let blockedByThemFlag = false;
         if (user && p && p.uid !== user.uid) {
           const forward = await getFriendStatus(user.uid, p.uid);
           const backward = await getFriendStatus(p.uid, user.uid);
@@ -146,10 +152,26 @@ export default function ProfilePage() {
           else if (backward === 'pending') st = 'received';
           if (active) setFriendState(st);
           watchedFlag = await isWatched(user.uid, p.uid);
+          // ブロック状態をAPI経由で取得（Admin SDKを使用）
+          try {
+            const token = await user.getIdToken();
+            const res = await fetch(`/api/block/status?targetUserId=${p.uid}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              blockedFlag = !!data.blocked;
+              blockedByThemFlag = !!data.blockedByThem;
+            }
+          } catch {
+            // API失敗時は false のまま
+          }
         } else {
           if (active) setFriendState('none');
         }
         if (active) setWatching(watchedFlag);
+        if (active) setBlocked(blockedFlag);
+        if (active) setBlockedByThem(blockedByThemFlag);
       } catch (e:any) {
         if (active) setError(translateError(e));
       } finally {
@@ -814,6 +836,41 @@ export default function ProfilePage() {
     finally { setWatchBusy(false); }
   }
 
+  // Block toggle
+  async function doBlockToggle() {
+    if (!user || !profile?.uid || user.uid === profile.uid) return;
+    setBlockBusy(true); setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/block/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetUserId: profile.uid }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || data?.error || 'BLOCK_FAILED');
+      }
+      const data = await res.json();
+      setBlocked(data.blocked);
+      // ブロックした場合、フレンドとウォッチも解除される
+      if (data.blocked) {
+        setFriendState('none');
+        setWatching(false);
+        show({ message: 'ブロックしました', variant: 'success' });
+      } else {
+        show({ message: 'ブロックを解除しました', variant: 'success' });
+      }
+    } catch (e:any) { 
+      setError(translateError(e)); 
+      show({ message: e?.message || 'ブロックに失敗しました', variant: 'error' });
+    }
+    finally { setBlockBusy(false); }
+  }
+
   // Delete account
   async function doDeleteAccount() {
     if (!user) return;
@@ -1115,9 +1172,10 @@ export default function ProfilePage() {
       )}
 
       {!isMe && user && (
-        <div className="flex gap-3">
-          <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={openFriendRemove} />
-          <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
+        <div className="flex gap-3 flex-wrap">
+          <FriendActions state={friendState} busy={busy} disabled={blocked || blockedByThem} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={openFriendRemove} />
+          <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid) || blocked || blockedByThem} />
+          <BlockButton blocked={blocked} busy={blockBusy} onToggle={doBlockToggle} />
           {!user && <p className="text-sm text-muted">ログインすると操作できます</p>}
         </div>
       )}
@@ -1132,6 +1190,19 @@ export default function ProfilePage() {
         onConfirm={() => { if (!friendRemoveBusy) confirmFriendRemove(); }}
       />
 
+  {/* ブロック中またはブロックされている場合はコンテンツを非表示 */}
+  {!isMe && (blocked || blockedByThem) ? (
+    <section className="space-y-4 pt-4 border-t border-line">
+      <div className="bg-surface-weak border border-line rounded p-4 space-y-2">
+        <p className="text-sm font-medium">
+          {blocked ? 'このユーザーをブロック中です' : 'このユーザーのコンテンツは表示できません'}
+        </p>
+        <p className="text-xs text-muted">
+          {blocked ? 'ブロックを解除するとアルバムなどのコンテンツを表示できます。' : 'このユーザーからのアクセスが制限されています。'}
+        </p>
+      </div>
+    </section>
+  ) : (
   <section className="space-y-4 pt-4 border-t border-line">
   {loadingExtra && <p className="text-sm text-muted/80">読み込み中...</p>}
         {extraError && <p className="text-sm text-red-600">{extraError}</p>}
@@ -1288,6 +1359,7 @@ export default function ProfilePage() {
           )}
         </div>
       </section>
+      )}
 
       {showDeleteAccount && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

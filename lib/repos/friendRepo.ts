@@ -13,6 +13,10 @@ export async function sendFriendRequest(userId: string, targetId: string) {
   if (userId === targetId) {
     throw ErrorHelpers.selfOperation('フレンド申請');
   }
+  
+  // ブロック判定は Firestore Rules で行われる
+  // クライアントSDKでは相手の blockedUsers を読めないため、ここではチェックしない
+  
   const id = friendId(userId, targetId);
   const ref = doc(db, COL.friends, id);
   const snap = await getDoc(ref);

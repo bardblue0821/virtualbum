@@ -65,8 +65,9 @@ export default function AlbumDetailPage() {
 
   // 権限判定
   const isOwner = !!(user && album?.ownerId === user.uid);
-  const { isFriend, isWatcher } = useAlbumAccess(album?.ownerId, user?.uid);
+  const { isFriend, isWatcher, isBlockedByOwner, isBlockingOwner } = useAlbumAccess(album?.ownerId, user?.uid);
   const isPrivate = album?.visibility === 'friends';
+  const isBlocked = isBlockedByOwner || isBlockingOwner;
 
   // いいね
   const { likeCount, liked, likeBusy, handleToggleLike } = useLikes(
@@ -203,6 +204,16 @@ export default function AlbumDetailPage() {
   }
 
   if (loading) return <div className="text-sm fg-subtle">読み込み中...</div>;
+
+  // ブロック判定: オーナーにブロックされている or オーナーをブロックしている場合は表示しない
+  if (isBlocked && !isOwner) {
+    return (
+      <div className="text-sm fg-muted p-8 text-center">
+        <p className="text-lg mb-2">⚠️</p>
+        <p>このアルバムは表示できません</p>
+      </div>
+    );
+  }
 
   if (!album) {
     return (

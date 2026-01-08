@@ -29,6 +29,25 @@ export const testUsers = {
     isAdmin: true,
     createdAt: new Date('2024-01-01'),
   },
+  // ブロック機能テスト用
+  userA: {
+    uid: 'user-a-111',
+    email: 'usera@example.com',
+    displayName: 'User A',
+    handle: 'usera',
+    bio: 'User A for block test',
+    iconURL: null,
+    createdAt: new Date('2024-01-01'),
+  },
+  userB: {
+    uid: 'user-b-222',
+    email: 'userb@example.com',
+    displayName: 'User B',
+    handle: 'userb',
+    bio: 'User B for block test',
+    iconURL: null,
+    createdAt: new Date('2024-01-01'),
+  },
 };
 
 // テスト用のアルバムデータ

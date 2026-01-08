@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 // import { addComment } from '@/lib/repos/commentRepo';
 import { adminAddComment } from '@/src/repositories/admin/firestore';
 import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { isEitherBlocking } from '@/lib/repos/blockRepo';
+import { getAlbum } from '@/lib/repos/albumRepo';
 
 // very simple in-memory rate limit (per IP): 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -51,6 +53,16 @@ export async function POST(req: NextRequest) {
     if (body.length > 1000) {
       return NextResponse.json({ error: 'COMMENT_TOO_LONG' }, { status: 400 });
     }
+    
+    // ブロック判定: アルバムオーナーとコメント投稿者間でブロック関係がある場合は拒否
+    const album = await getAlbum(albumId);
+    if (album && album.ownerId !== userId) {
+      const blocked = await isEitherBlocking(album.ownerId, userId);
+      if (blocked) {
+        return NextResponse.json({ error: 'BLOCKED', message: 'ブロックされているためコメントできません' }, { status: 403 });
+      }
+    }
+    
   await adminAddComment(albumId, userId, body);
     return NextResponse.json({ ok: true });
   } catch (e: any) {

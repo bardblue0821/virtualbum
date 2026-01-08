@@ -10,4 +10,6 @@ export const COL = {
   notifications: 'notifications',
   reactions: 'reactions',
   reposts: 'reposts',
+  // サブコレクション: users/{userId}/blockedUsers
+  blockedUsers: 'blockedUsers',
 } as const

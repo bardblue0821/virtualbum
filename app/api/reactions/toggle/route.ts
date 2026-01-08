@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 // import { toggleReaction } from '@/lib/repos/reactionRepo';
 import { adminToggleReaction } from '@/src/repositories/admin/firestore';
 import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { isEitherBlocking } from '@/lib/repos/blockRepo';
+import { getAlbum } from '@/lib/repos/albumRepo';
 
 // very simple in-memory rate limit (per IP): 20 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -44,6 +46,16 @@ export async function POST(req: NextRequest) {
     if (!decoded || decoded.uid !== userId) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
+    
+    // ブロック判定: アルバムオーナーとリアクション投稿者間でブロック関係がある場合は拒否
+    const album = await getAlbum(albumId);
+    if (album && album.ownerId !== userId) {
+      const blocked = await isEitherBlocking(album.ownerId, userId);
+      if (blocked) {
+        return NextResponse.json({ error: 'BLOCKED', message: 'ブロックされているためリアクションできません' }, { status: 403 });
+      }
+    }
+    
   const result = await adminToggleReaction(albumId, userId, emoji);
     // result has shape { added: boolean } in repo
     return NextResponse.json({ ok: true, added: !!(result as any)?.added });
