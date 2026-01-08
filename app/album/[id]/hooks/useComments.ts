@@ -11,6 +11,7 @@ export interface UseCommentsResult {
   commentText: string;
   commenting: boolean;
   setCommentText: React.Dispatch<React.SetStateAction<string>>;
+  setEditingCommentBody: React.Dispatch<React.SetStateAction<string>>;
   beginEditComment: (commentId: string) => void;
   cancelEditComment: () => void;
   saveEditComment: (commentId: string) => Promise<void>;
@@ -109,6 +110,7 @@ export function useComments(
     commentText,
     commenting,
     setCommentText,
+    setEditingCommentBody,
     beginEditComment,
     cancelEditComment,
     saveEditComment,
