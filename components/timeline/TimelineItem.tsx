@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Avatar from "../profile/Avatar";
 import { Button } from "../ui/Button";
 import AlbumActionsMenu from "../album/AlbumActionsMenu";
@@ -51,6 +51,7 @@ export function TimelineItem(props: TimelineItemProps) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCommentBox, setShowCommentBox] = useState(false);
+  const commentInputRef = useRef<HTMLInputElement>(null);
 
   // フレンド限定アルバムで、オーナーでもフレンドでもない場合は一部操作を制限
   const isFriendsOnly = album.visibility === 'friends';
@@ -73,6 +74,16 @@ export function TimelineItem(props: TimelineItemProps) {
     album.id,
     onVisibilityChange
   );
+
+  // コメント欄が開いたら自動でフォーカス
+  useEffect(() => {
+    if (showCommentBox && commentInputRef.current) {
+      commentInputRef.current.focus();
+    }
+  }, [showCommentBox]);
+
+  // コメント欄を開く時は必ずtrueにする
+  const handleToggleCommentBox = () => setShowCommentBox(true);
 
   return (
     <article ref={visibilityRef} className="py-4 space-y-3">
@@ -108,7 +119,7 @@ export function TimelineItem(props: TimelineItemProps) {
           repostDisabled={!canInteract}
           commentCount={commentCount}
           showCommentBox={showCommentBox}
-          onToggleCommentBox={() => setShowCommentBox((v) => !v)}
+          onToggleCommentBox={handleToggleCommentBox}
           hasCommentSubmit={!!onCommentSubmit}
           currentUserId={currentUserId}
         />
@@ -127,6 +138,7 @@ export function TimelineItem(props: TimelineItemProps) {
       {onCommentSubmit && showCommentBox && (
         <div className="flex items-center gap-2">
           <input
+            ref={commentInputRef}
             aria-label="コメント入力"
             value={text}
             onChange={(e) => setText(e.target.value)}
