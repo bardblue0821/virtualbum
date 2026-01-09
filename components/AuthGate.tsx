@@ -8,7 +8,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   // 公開パス: トップ(/)、/login、パスワードリセット関連を許可
-  const publicPaths = new Set<string>(['/', '/login', '/forgot-password', '/reset-password', '/termsofservice']);
+  const publicPaths = new Set<string>(['/', '/login', '/forgot-password', '/reset-password', '/termsofservice', '/privacy-policy', '/faq']);
   const isPublic = publicPaths.has(pathname);
 
   useEffect(() => {

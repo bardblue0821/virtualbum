@@ -205,7 +205,7 @@ function SideNavInner() {
             >
               {currentTheme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード'}
             </Button>
-            <Link href="/policy">
+            <Link href="/termsofservice">
               <Button
                 variant="ghost"
                 size="sm"
@@ -214,6 +214,28 @@ function SideNavInner() {
                 onClick={() => setMenuOpen(false)}
               >
                 利用規約
+              </Button>
+            </Link>
+            <Link href="/privacy-policy">
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                className="border-0 bg-transparent hover:bg-transparent justify-start"
+                onClick={() => setMenuOpen(false)}
+              >
+                プライバシーポリシー
+              </Button>
+            </Link>
+            <Link href="/faq">
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                className="border-0 bg-transparent hover:bg-transparent justify-start"
+                onClick={() => setMenuOpen(false)}
+              >
+                FAQ
               </Button>
             </Link>
             {user && (
