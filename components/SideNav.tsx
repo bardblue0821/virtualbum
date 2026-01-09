@@ -8,6 +8,7 @@ import { getUser } from '@/lib/repos/userRepo';
 import Avatar from '@/components/profile/Avatar';
 import React from 'react';
 import { Button } from '@/components/ui/Button';
+import MenuButton from '@/components/ui/MenuButton';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 
@@ -193,65 +194,31 @@ function SideNavInner() {
         {menuOpen && (
           <div ref={menuRef} className="absolute bottom-14 left-0 z-50 bg-background border border-line rounded-md shadow-md min-w-40 p-2">
             {/* テーマ切り替え */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              fullWidth
-              className="border-0 bg-transparent hover:bg-transparent justify-start"
-              onClick={() => {
-                toggleTheme();
-              }}
-            >
+            <MenuButton onClick={toggleTheme}>
               {currentTheme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード'}
-            </Button>
-            <Link href="/termsofservice">
-              <Button
-                variant="ghost"
-                size="sm"
-                fullWidth
-                className="border-0 bg-transparent hover:bg-transparent justify-start"
-                onClick={() => setMenuOpen(false)}
-              >
+            </MenuButton>
+            <Link href="/termsofservice" className="block w-full">
+              <MenuButton onClick={() => setMenuOpen(false)}>
                 利用規約
-              </Button>
+              </MenuButton>
             </Link>
-            <Link href="/privacy-policy">
-              <Button
-                variant="ghost"
-                size="sm"
-                fullWidth
-                className="border-0 bg-transparent hover:bg-transparent justify-start"
-                onClick={() => setMenuOpen(false)}
-              >
+            <Link href="/privacy-policy" className="block w-full">
+              <MenuButton onClick={() => setMenuOpen(false)}>
                 プライバシーポリシー
-              </Button>
+              </MenuButton>
             </Link>
-            <Link href="/faq">
-              <Button
-                variant="ghost"
-                size="sm"
-                fullWidth
-                className="border-0 bg-transparent hover:bg-transparent justify-start"
-                onClick={() => setMenuOpen(false)}
-              >
+            <Link href="/faq" className="block w-full">
+              <MenuButton onClick={() => setMenuOpen(false)}>
                 FAQ
-              </Button>
+              </MenuButton>
             </Link>
             {user && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                fullWidth
-                className="border-0 bg-transparent hover:bg-transparent justify-start text-red-600"
-                onClick={() => {
-                  signOut(auth).catch(() => {});
-                  setMenuOpen(false);
-                }}
-              >
+              <MenuButton className="text-red-600" onClick={() => {
+                signOut(auth).catch(() => {});
+                setMenuOpen(false);
+              }}>
                 ログアウト
-              </Button>
+              </MenuButton>
             )}
           </div>
         )}
