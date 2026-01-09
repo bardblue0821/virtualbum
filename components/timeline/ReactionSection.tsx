@@ -10,6 +10,8 @@ interface ReactionSectionProps {
   albumId: string;
   reactions: ReactionData[];
   onToggleReaction?: (emoji: string) => void;
+  /** 表示するリアクションの上限数（デフォルト: 30） */
+  maxReactions?: number;
 }
 
 // カテゴリキー型
@@ -18,7 +20,7 @@ type CategoryKey = typeof REACTION_CATEGORIES[number]['key'];
 /**
  * リアクションチップとピッカー
  */
-export function ReactionSection({ albumId, reactions, onToggleReaction }: ReactionSectionProps) {
+export function ReactionSection({ albumId, reactions, onToggleReaction, maxReactions = 30 }: ReactionSectionProps) {
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
   const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
@@ -90,12 +92,20 @@ export function ReactionSection({ albumId, reactions, onToggleReaction }: Reacti
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reactions]);
 
+  // 表示するリアクションを上限数で制限
+  const displayReactions = useMemo(() => {
+    const filtered = reactions.filter(r => r.count > 0);
+    return filtered.slice(0, maxReactions);
+  }, [reactions, maxReactions]);
+
+  const hasMoreReactions = reactions.filter(r => r.count > 0).length > maxReactions;
+
   return (
     <div className="flex items-center gap-2 flex-wrap relative">
       {/* 既存リアクションチップ */}
-      {reactions.length > 0 && (
+      {displayReactions.length > 0 && (
         <>
-          {reactions.filter(r => r.count > 0).map((r) => (
+          {displayReactions.map((r) => (
             <ReactionChip
               key={r.emoji}
               emoji={r.emoji}
@@ -114,6 +124,9 @@ export function ReactionSection({ albumId, reactions, onToggleReaction }: Reacti
               loading={reactorLoading[r.emoji]}
             />
           ))}
+          {hasMoreReactions && (
+            <span className="text-xs text-muted px-1">+{reactions.filter(r => r.count > 0).length - maxReactions}</span>
+          )}
         </>
       )}
 

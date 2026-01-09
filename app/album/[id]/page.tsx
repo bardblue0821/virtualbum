@@ -103,6 +103,7 @@ export default function AlbumDetailPage() {
     commentText,
     commenting,
     setCommentText,
+    setEditingCommentBody,
     beginEditComment,
     cancelEditComment,
     saveEditComment,
@@ -351,7 +352,7 @@ export default function AlbumDetailPage() {
         commentText={commentText}
         commenting={commenting}
         onEditRequest={beginEditComment}
-        onEditChange={(_, value) => setCommentText(value)}
+        onEditChange={(_, value) => setEditingCommentBody(value)}
         onEditSave={saveEditComment}
         onEditCancel={cancelEditComment}
         onDelete={handleDeleteComment}

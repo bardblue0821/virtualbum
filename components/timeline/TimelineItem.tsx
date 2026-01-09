@@ -95,29 +95,30 @@ export function TimelineItem(props: TimelineItemProps) {
         <ImageGrid images={images} albumId={album.id} />
       </div>
 
-      {/* アクションバー */}
-      <ActionBar
-        albumId={album.id}
-        likeCount={likeCount}
-        liked={liked}
-        onLike={() => onLike?.()}
-        repostCount={repostCount}
-        reposted={reposted}
-        onToggleRepost={onToggleRepost}
-        repostDisabled={!canInteract}
-        commentCount={commentCount}
-        showCommentBox={showCommentBox}
-        onToggleCommentBox={() => setShowCommentBox((v) => !v)}
-        hasCommentSubmit={!!onCommentSubmit}
-        currentUserId={currentUserId}
-      />
-
-      {/* リアクション */}
-      <ReactionSection
-        albumId={album.id}
-        reactions={reactions}
-        onToggleReaction={onToggleReaction}
-      />
+      {/* アクションバー + リアクション (一行表示) */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <ActionBar
+          albumId={album.id}
+          likeCount={likeCount}
+          liked={liked}
+          onLike={() => onLike?.()}
+          repostCount={repostCount}
+          reposted={reposted}
+          onToggleRepost={onToggleRepost}
+          repostDisabled={!canInteract}
+          commentCount={commentCount}
+          showCommentBox={showCommentBox}
+          onToggleCommentBox={() => setShowCommentBox((v) => !v)}
+          hasCommentSubmit={!!onCommentSubmit}
+          currentUserId={currentUserId}
+        />
+        <ReactionSection
+          albumId={album.id}
+          reactions={reactions}
+          onToggleReaction={onToggleReaction}
+          maxReactions={30}
+        />
+      </div>
 
       {/* コメントプレビュー */}
       <CommentPreview comments={commentsPreview} />
