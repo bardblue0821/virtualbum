@@ -23,6 +23,7 @@ import FriendActions from '../../../components/profile/FriendActions';
 import WatchActions from '../../../components/profile/WatchActions';
 import FriendRemoveConfirmModal from '../../../components/profile/FriendRemoveConfirmModal';
 import BlockButton from '../../../components/user/BlockButton';
+import MuteButton from '../../../components/user/MuteButton';
 import { buildProfilePatch } from '../../../src/services/profile/buildPatch';
 import { TimelineItem } from '../../../components/timeline/TimelineItem';
 import GalleryGrid, { type PhotoItem } from '../../../components/gallery/GalleryGrid';
@@ -56,6 +57,8 @@ export default function ProfilePage() {
   const [blocked, setBlocked] = useState(false);
   const [blockedByThem, setBlockedByThem] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
 
   // Extra info
   const [ownAlbums, setOwnAlbums] = useState<any[] | null>(null);
@@ -166,6 +169,21 @@ export default function ProfilePage() {
           } catch {
             // API失敗時は false のまま
           }
+          // ミュート状態をAPI経由で取得
+          let mutedFlag = false;
+          try {
+            const token = await user.getIdToken();
+            const res = await fetch(`/api/mute/status?targetUserId=${p.uid}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              mutedFlag = !!data.muted;
+            }
+          } catch {
+            // API失敗時は false のまま
+          }
+          if (active) setMuted(mutedFlag);
         } else {
           if (active) setFriendState('none');
         }
@@ -871,6 +889,38 @@ export default function ProfilePage() {
     finally { setBlockBusy(false); }
   }
 
+  // Mute toggle
+  async function doMuteToggle() {
+    if (!user || !profile?.uid || user.uid === profile.uid) return;
+    setMuteBusy(true); setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/mute/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetUserId: profile.uid }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || data?.error || 'MUTE_FAILED');
+      }
+      const data = await res.json();
+      setMuted(data.muted);
+      if (data.muted) {
+        show({ message: 'ミュートしました', variant: 'success' });
+      } else {
+        show({ message: 'ミュートを解除しました', variant: 'success' });
+      }
+    } catch (e:any) { 
+      setError(translateError(e)); 
+      show({ message: e?.message || 'ミュートに失敗しました', variant: 'error' });
+    }
+    finally { setMuteBusy(false); }
+  }
+
   // Delete account
   async function doDeleteAccount() {
     if (!user) return;
@@ -1176,6 +1226,7 @@ export default function ProfilePage() {
           <FriendActions state={friendState} busy={busy} disabled={blocked || blockedByThem} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={openFriendRemove} />
           <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid) || blocked || blockedByThem} />
           <BlockButton blocked={blocked} busy={blockBusy} onToggle={doBlockToggle} />
+          <MuteButton muted={muted} busy={muteBusy} onToggle={doMuteToggle} />
           {!user && <p className="text-sm text-muted">ログインすると操作できます</p>}
         </div>
       )}

@@ -12,6 +12,7 @@ import { getAlbum } from "@/lib/repos/albumRepo";
 import { batchGetUsers } from "@/lib/utils/batchQuery";
 import { createLogger } from "@/lib/logger";
 import { getBlockedUserIds } from "@/lib/repos/blockRepo";
+import { getMutedUserIds } from "@/lib/repos/muteRepo";
 
 const log = createLogger('timeline:listLatestAlbums');
 
@@ -54,25 +55,29 @@ export async function listLatestAlbumsVMLimited(
   ownerSet.add(currentUserId);
   const friendOwnerSet = new Set<string>();
   let blockedUserIds: string[] = [];
+  let mutedUserIds: string[] = [];
   try {
-    const [friends, watched, blocked] = await Promise.all([
+    const [friends, watched, blocked, muted] = await Promise.all([
       listAcceptedFriends(currentUserId),
       listWatchedOwnerIds(currentUserId),
       getBlockedUserIds(currentUserId),
+      getMutedUserIds(currentUserId),
     ]);
     blockedUserIds = blocked;
+    mutedUserIds = muted;
     for (const f of friends) {
       const other = f.userId === currentUserId ? f.targetId : f.userId;
       if (other) { ownerSet.add(other); friendOwnerSet.add(other); }
     }
     for (const w of watched) ownerSet.add(w);
   } catch (e) {
-    log.warn("friend/watch/block fetch error", e);
+    log.warn("friend/watch/block/mute fetch error", e);
   }
 
-  // ブロック済みユーザーを除外
+  // ブロック済み・ミュート済みユーザーを除外
   const blockedSet = new Set(blockedUserIds);
-  const ownerIds = Array.from(ownerSet).filter((oid) => !blockedSet.has(oid));
+  const mutedSet = new Set(mutedUserIds);
+  const ownerIds = Array.from(ownerSet).filter((oid) => !blockedSet.has(oid) && !mutedSet.has(oid));
   // フレンドでない（ウォッチのみ等）オーナーは公開アルバムのみ取得するように制約
   const publicOnlyOwners = new Set<string>(
     ownerIds.filter((oid) => oid !== currentUserId && !friendOwnerSet.has(oid))
@@ -171,6 +176,7 @@ export async function listLatestAlbumsVMLimited(
       ]);
 
       // 「誰かが画像を追加しました」表示用: 最新画像の uploader が owner 以外のときに表示
+      // ただし、ミュート済みユーザーの場合は表示しない
       let imageAdded: any = undefined;
       try {
         const latestImg = ((imgs as any[]) || [])
@@ -181,7 +187,7 @@ export async function listLatestAlbumsVMLimited(
             return bm - am;
           })[0];
 
-        if (latestImg?.uploaderId && latestImg.uploaderId !== album.ownerId) {
+        if (latestImg?.uploaderId && latestImg.uploaderId !== album.ownerId && !mutedSet.has(latestImg.uploaderId)) {
           // バッチ取得したユーザー情報を使用（なければ個別取得）
           let au = cache.get(latestImg.uploaderId);
           if (!au) {
@@ -199,7 +205,9 @@ export async function listLatestAlbumsVMLimited(
         imageAdded = undefined;
       }
       
+      // ミュート済みユーザーのコメントを除外
       const cAsc = [...cmts]
+        .filter((c) => !mutedSet.has(c.userId))
         .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
       const latest = cAsc.slice(-1)[0];
       const previewDesc = cAsc.slice(-3).reverse();

@@ -19,6 +19,7 @@ import ReportConfirmModal from "../../components/album/ReportConfirmModal";
 import { deleteAlbum } from "../../lib/repos/albumRepo";
 import { listAcceptedFriends } from "../../lib/repos/friendRepo";
 import { listWatchedOwnerIds } from "../../lib/repos/watchRepo";
+import { getMutedUserIds } from "../../lib/repos/muteRepo";
 
 
 export default function TimelinePage() {
@@ -48,6 +49,9 @@ export default function TimelinePage() {
   const loadMoreRef = useRef<() => void>(() => {});
   const [friendSet, setFriendSet] = useState<Set<string>>(new Set());
   const [watchSet, setWatchSet] = useState<Set<string>>(new Set());
+
+  // ★ ミュートユーザーIDのセット
+  const mutedSetRef = useRef<Set<string>>(new Set());
 
   // ★ 可視範囲のアルバムIDを追跡
   const visibleAlbumIdsRef = useRef<Set<string>>(new Set());
@@ -151,7 +155,10 @@ export default function TimelinePage() {
 
     // comments: 最新コメントのみ更新
     const cUnsub = await subscribeComments(albumId, (list) => {
-      const sorted = [...list]
+      // ミュートユーザーのコメントを除外
+      const mutedSet = mutedSetRef.current;
+      const filtered = list.filter((c) => !mutedSet.has(c.userId));
+      const sorted = [...filtered]
         .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
       const latest = sorted.slice(-1)[0];
       const previewRawDesc = sorted.slice(-3).reverse();
@@ -171,14 +178,14 @@ export default function TimelinePage() {
           ...r,
           latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
           commentsPreview: preview,
-          commentCount: list.length,
+          commentCount: filtered.length,
         } as any));
       })().catch(() => {
         updateRowByAlbumId(albumId, (r) => ({
           ...r,
           latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
           commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })),
-          commentCount: list.length,
+          commentCount: filtered.length,
         } as any));
       });
     }, (err) => console.warn("comments subscribe error", err));
@@ -239,11 +246,12 @@ export default function TimelinePage() {
         // Intersection Observer が可視範囲のアイテムのみ購読開始する
         console.log(`[timeline] initial load: ${enriched.length} items (subscriptions managed by Intersection Observer)`);
         
-        // 初回にフレンド/ウォッチの関係をまとめて取得
+        // 初回にフレンド/ウォッチ/ミュートの関係をまとめて取得
         try {
-          const [friends, watchedOwners] = await Promise.all([
+          const [friends, watchedOwners, mutedIds] = await Promise.all([
             listAcceptedFriends(currentUid),
             listWatchedOwnerIds(currentUid),
+            getMutedUserIds(currentUid),
           ]);
           const fset = new Set<string>();
           for (const fd of friends) {
@@ -252,6 +260,7 @@ export default function TimelinePage() {
           }
           setFriendSet(fset);
           setWatchSet(new Set(watchedOwners || []));
+          mutedSetRef.current = new Set(mutedIds || []);
         } catch {}
       } else {
         const existingIds = new Set(prev.map(r => r.album.id));

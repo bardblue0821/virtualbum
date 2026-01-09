@@ -195,6 +195,17 @@ service cloud.firestore {
       allow delete: if isUser(userId);
       allow update: if false;
     }
+
+    // mutedUsers/{mutedId} （ユーザーのミュートリスト）
+    match /users/{userId}/mutedUsers/{mutedId} {
+      // 本人のみ読み書き可能
+      allow read: if isUser(userId);
+      allow create: if isUser(userId)
+        && request.resource.data.keys().hasAll(['id','mutedAt'])
+        && request.resource.data.id == mutedId;
+      allow delete: if isUser(userId);
+      allow update: if false;
+    }
     
     
     // notifications/{nid}

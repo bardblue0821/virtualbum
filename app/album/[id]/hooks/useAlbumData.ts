@@ -4,6 +4,7 @@ import { translateError } from "@/lib/errors";
 import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
 import { subscribeComments } from "@/lib/repos/commentRepo";
 import { batchGetUsers } from "@/lib/utils/batchQuery";
+import { getMutedUserIds } from "@/lib/repos/muteRepo";
 import type { UserRef } from "@/src/models/album";
 
 export type AlbumRecord = {
@@ -99,9 +100,24 @@ export function useAlbumData(
         
         if (cancelled) return;
         
+        // ミュートユーザーIDを取得
+        let mutedSet = new Set<string>();
+        if (userId) {
+          try {
+            const mutedIds = await getMutedUserIds(userId);
+            mutedSet = new Set(mutedIds);
+          } catch (e) {
+            console.warn('Failed to get muted user ids', e);
+          }
+        }
+
         setAlbum(vm.album as AlbumRecord);
         setImages(vm.images as ImageRecord[]);
-        setComments(vm.commentsAsc as CommentRecord[]);
+        // ミュートユーザーのコメントを除外
+        const filteredComments = (vm.commentsAsc as CommentRecord[]).filter(
+          (c) => !mutedSet.has(c.userId)
+        );
+        setComments(filteredComments);
         setReactions(vm.reactions);
 
         // コメントのリアルタイム購読
@@ -109,11 +125,13 @@ export function useAlbumData(
           albumId,
           (snapshotList) => {
             if (cancelled) return;
-            const list = [...snapshotList].sort(
-              (a, b) =>
-                (a.createdAt?.seconds || a.createdAt || 0) -
-                (b.createdAt?.seconds || b.createdAt || 0),
-            );
+            const list = [...snapshotList]
+              .filter((c) => !mutedSet.has(c.userId)) // ミュートユーザーのコメントを除外
+              .sort(
+                (a, b) =>
+                  (a.createdAt?.seconds || a.createdAt || 0) -
+                  (b.createdAt?.seconds || b.createdAt || 0),
+              );
             setComments(list as CommentRecord[]);
           },
           (err) => console.warn("comments subscribe error", err),

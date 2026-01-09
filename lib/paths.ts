@@ -12,4 +12,6 @@ export const COL = {
   reposts: 'reposts',
   // サブコレクション: users/{userId}/blockedUsers
   blockedUsers: 'blockedUsers',
+  // サブコレクション: users/{userId}/mutedUsers
+  mutedUsers: 'mutedUsers',
 } as const
