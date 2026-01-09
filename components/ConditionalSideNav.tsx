@@ -7,7 +7,7 @@ export default function ConditionalSideNav() {
   
   // 公開ページ（認証不要ページ）ではSideNavを非表示
   // register ページも追加
-  const publicPaths = new Set<string>(['/', '/login', '/register', '/forgot-password', '/reset-password']);
+  const publicPaths = new Set<string>(['/', '/login', '/register', '/forgot-password', '/reset-password', '/termsofservice']);
   const isPublicPage = publicPaths.has(pathname) || pathname.startsWith('/register/');
   
   if (isPublicPage) {

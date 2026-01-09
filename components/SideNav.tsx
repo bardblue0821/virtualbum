@@ -205,6 +205,17 @@ function SideNavInner() {
             >
               {currentTheme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード'}
             </Button>
+            <Link href="/policy">
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                className="border-0 bg-transparent hover:bg-transparent justify-start"
+                onClick={() => setMenuOpen(false)}
+              >
+                利用規約
+              </Button>
+            </Link>
             {user && (
               <Button
                 type="button"

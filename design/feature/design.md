@@ -2568,6 +2568,9 @@ const MAX_CONCURRENT_SUBSCRIPTIONS = 10;
 
 
 ### ローカル環境でシーディング・テスト
+- DONE
+
+### 
 
 
 
