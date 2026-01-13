@@ -47,16 +47,19 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
               onKeyDown={onInputKeyDownBlurOnEnter}
               className="mt-1 input-underline font-bold text-2xl"
               placeholder="タイトル"
+              aria-label="アルバムタイトル"
             />
           </div>
-          <div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg" title="URL" aria-label="URL">🌐</span>
             <input
               value={editPlaceUrl}
               onChange={(e) => onPlaceUrlChange(e.target.value)}
               onBlur={onPlaceUrlBlur}
               onKeyDown={onInputKeyDownBlurOnEnter}
-              className="mt-1 input-underline text-sm"
-              placeholder="https://vrchat.com/..."
+              className="mt-1 input-underline text-sm flex-1"
+              placeholder="ワールドURLやBOOTHのリンクなど"
+              aria-label="アルバムURL"
             />
           </div>
           <div>
@@ -87,12 +90,15 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
       )}
 
       {!isOwner && album?.placeUrl && (
-        <a
-          href={album.placeUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-1 inline-block text-sm link-accent"
-        >撮影場所</a>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-base" title="URL" aria-label="URL">🌐</span>
+          <a
+            href={album.placeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block text-sm link-accent hover:underline"
+          >{album.placeUrl}</a>
+        </div>
       )}
 
       {!isOwner && Array.isArray(album?.links) && (album?.links?.length ?? 0) > 0 && (

@@ -152,6 +152,7 @@ export function ActionBar({
         <button
           aria-label={liked ? "いいね済み" : "いいね"}
           aria-pressed={liked}
+          title={liked ? "いいね済み" : "いいね"}
           className={`${liked ? "text-pink-600" : "text-muted"}`}
           onClick={onLike}
         >
@@ -176,6 +177,7 @@ export function ActionBar({
         <button
           aria-label={reposted ? "リポスト済み" : "リポスト"}
           aria-pressed={reposted}
+          title={reposted ? "リポスト済み" : "リポスト"}
           className={`${reposted ? "text-green-600" : "text-muted"} ${repostDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           onClick={() => { 
             if (repostDisabled) return; 
@@ -199,6 +201,7 @@ export function ActionBar({
         <button
           type="button"
           aria-label="コメント入力を開閉"
+          title="コメントする"
           className={`text-muted ${showCommentBox ? 'opacity-100' : 'opacity-80'}`}
           onClick={onToggleCommentBox}
         >

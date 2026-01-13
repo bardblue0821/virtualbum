@@ -135,6 +135,7 @@ export function ReactionSection({ albumId, reactions, onToggleReaction, maxReact
         ref={pickerBtnRef}
         type="button"
         aria-label="リアクションを追加"
+        title="リアクションを追加"
         disabled={!onToggleReaction}
         onClick={() => setPickerOpen((o) => !o)}
         className="px-1 text-lg leading-none text-muted disabled:opacity-50"
@@ -193,6 +194,7 @@ function ReactionChip({
       <button
         type="button"
         aria-label={`リアクション ${emoji}`}
+        title={`リアクション ${emoji}`}
         aria-pressed={mine}
         onClick={onToggle}
         className="rounded border px-2 py-1 text-sm bg-background"

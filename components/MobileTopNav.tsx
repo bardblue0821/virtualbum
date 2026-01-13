@@ -40,8 +40,12 @@ function IconBell() {
 function IconPlus() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 5v14"/>
-      <path d="M5 12h14"/>
+      {/* 本のアイコン */}
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      {/* ＋マーク（右上に小さく） */}
+      <line x1="17" y1="5" x2="17" y2="10" strokeWidth="2"/>
+      <line x1="14.5" y1="7.5" x2="19.5" y2="7.5" strokeWidth="2"/>
     </svg>
   );
 }

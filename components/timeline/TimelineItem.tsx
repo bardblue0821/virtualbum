@@ -101,9 +101,31 @@ export function TimelineItem(props: TimelineItemProps) {
         onRequestReport={onRequestReport}
       />
 
-      {/* 画像グリッド */}
-      <div className={`overflow-hidden ${isFriend ? 'bg-friend/10' : isWatched ? 'bg-watch/10' : ''}`}>
+      {/* 画像グリッド + 写真追加ボタン */}
+      <div className={`relative overflow-hidden ${isFriend ? 'bg-friend/10' : isWatched ? 'bg-watch/10' : ''}`}>
         <ImageGrid images={images} albumId={album.id} />
+        {/* 写真追加ボタン（右下に配置、アクセントカラー背景） */}
+        <a
+          href={`/album/${album.id}`}
+          className="absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+          style={{ backgroundColor: 'var(--accent)' }}
+          title="写真を追加"
+          aria-label="写真を追加"
+        >
+          <span className="relative text-white">
+            {/* 画像アイコン */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute -left-1 -top-1">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            {/* ＋マーク */}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="absolute top-0 left-1">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </span>
+        </a>
       </div>
 
       {/* アクションバー + リアクション (一行表示) */}

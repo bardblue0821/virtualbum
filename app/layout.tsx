@@ -7,7 +7,6 @@ import ConditionalSideNav from "../components/ConditionalSideNav";
 import MobileTopNav from "../components/MobileTopNav";
 import Providers from "./providers";
 import { ColorSchemeScript } from "@mantine/core";
-import AppFooter from "../components/AppFooter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,7 +49,6 @@ export default function RootLayout({
                 </div>
               </div>
             </div>
-            <AppFooter />
           </ToastProvider>
         </Providers>
       </body>
