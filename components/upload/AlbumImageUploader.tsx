@@ -230,6 +230,11 @@ export default function AlbumImageUploader({
 
   function explainError(e: any): string {
     const code = e?.code || e?.message || "";
+    const errStr = String(code).toLowerCase();
+    
+    // デバッグ用: エラーの詳細をコンソールに出力
+    console.error('[AlbumImageUploader] Upload error:', { code, message: e?.message, error: e });
+    
     if (!navigator.onLine) return "ネットワークに接続できません。接続を確認してください。";
     if (typeof code === "string") {
       // API エラーコード
@@ -241,11 +246,18 @@ export default function AlbumImageUploader({
       if (code === "RATE_LIMITED") return "リクエストが多すぎます。しばらくしてから再試行してください";
       
       // Firebase Storage エラー
-      if (code.includes("unauthorized") || code.includes("permission-denied")) return "権限がありません（ログインまたは権限設定をご確認ください）";
-      if (code.includes("quota-exceeded")) return "容量制限を超えました。管理者にお問い合わせください。";
-      if (code.includes("retry-limit-exceeded") || code.includes("network")) return "ネットワークエラーが発生しました。しばらくして再試行してください。";
+      if (errStr.includes("unauthorized") || errStr.includes("permission-denied")) return "権限がありません（ログインまたは権限設定をご確認ください）";
+      if (errStr.includes("quota-exceeded")) return "容量制限を超えました。管理者にお問い合わせください。";
+      if (errStr.includes("retry-limit-exceeded") || errStr.includes("network")) return "ネットワークエラーが発生しました。しばらくして再試行してください。";
+      
+      // 画像処理エラー
+      if (errStr.includes("image_load_error")) return "画像の読み込みに失敗しました。別の画像をお試しください。";
+      if (errStr.includes("canvas_context_error") || errStr.includes("canvas_to_blob")) return "画像の処理に失敗しました。別の画像をお試しください。";
+      
+      // 検出/解析エラー
+      if (errStr.includes("unable to detect") || errStr.includes("detect")) return "画像の形式を認識できません。PNG/JPEG/GIF/WebP形式をお試しください。";
     }
-    return "アップロードに失敗しました";
+    return `アップロードに失敗しました (${code || 'UNKNOWN'})`;
   }
 
   async function handleUploadAll() {
@@ -393,7 +405,7 @@ export default function AlbumImageUploader({
 
   return (
     <>
-      <Paper withBorder p="md" radius="md" className="surface">
+      <Paper withBorder p="md" radius="md" className="surface bg-background">
         <Stack gap="xs">
           
           <Dropzone

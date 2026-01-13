@@ -101,6 +101,14 @@ export async function listAlbumIdsByUploader(userId: string, limitCount = 500) {
   return Array.from(set).slice(0, limitCount)
 }
 
+// ユーザーが投稿した画像の総数を取得
+export async function countImagesByUploader(userId: string): Promise<number> {
+  const q = query(collection(db, COL.albumImages), where('uploaderId', '==', userId))
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(q)
+  return snap.size
+}
+
 export async function deleteImage(imageId: string) {
   // ルール側で uploader または owner を許可。ここでは単純削除。
   await deleteDoc(doc(db, COL.albumImages, imageId))

@@ -87,29 +87,58 @@ export function CommentList({
     return comment.userId === currentUserId || (!!albumOwnerId && currentUserId === albumOwnerId);
   };
 
+  // コメントを新しい順にソート
+  const sortedComments = useMemo(() => {
+    if (!comments || comments.length === 0) return [];
+    return [...comments].sort((a, b) => {
+      const getTime = (ts: any): number => {
+        if (!ts) return 0;
+        if (ts instanceof Date) return ts.getTime();
+        if (typeof ts.toDate === "function") return ts.toDate().getTime();
+        if (typeof ts === 'number') return ts;
+        return new Date(ts).getTime() || 0;
+      };
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    });
+  }, [comments]);
+
   if (!comments || comments.length === 0) {
     return <p className="text-sm fg-subtle">コメントなし</p>;
   }
 
   return (
     <ul className="space-y-2 mb-3">
-      {comments.map((comment) => {
+      {sortedComments.map((comment) => {
         const isEditing = editingCommentId === comment.id;
         const manageable = decideCanManage(comment);
         const u = userMap[comment.userId];
         const atName = u?.handle ? `@${u.handle}` : `@${comment.userId.slice(0,6)}`;
+        const isOwner = comment.userId === albumOwnerId;
         return (
           <li key={comment.id} className="space-y-2 border-b border-line py-2 text-sm">
             {/* ヘッダー: アイコン / ハンドルネーム / ＠ネーム / 時刻 */}
             <div className="flex items-center gap-3">
-              {u?.iconURL ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={u.iconURL} alt="" className="h-12 w-12 rounded-md object-cover shrink-0" />
-              ) : (
-                <span className="inline-flex h-12 w-12 items-center justify-center rounded-md surface-alt text-[13px] fg-muted shrink-0">
-                  {(u?.displayName?.[0] || '?')}
-                </span>
-              )}
+              <div className="relative shrink-0">
+                {/* アルバムオーナーの王冠アイコン（アイコンの上に表示） */}
+                {isOwner && (
+                  <span 
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 text-yellow-500 drop-shadow-sm" 
+                    style={{ fontSize: '14px' }}
+                    title="アルバムオーナー"
+                    aria-label="アルバムオーナー"
+                  >
+                    👑
+                  </span>
+                )}
+                {u?.iconURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={u.iconURL} alt="" className="h-12 w-12 rounded-md object-cover" />
+                ) : (
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-md surface-alt text-[13px] fg-muted">
+                    {(u?.displayName?.[0] || '?')}
+                  </span>
+                )}
+              </div>
               <div className="min-w-0 flex flex-col gap-0.5">
                 <span className="font-medium text-foreground truncate leading-tight">{u?.displayName || "不明なユーザー"}</span>
                 <span className="text-[11px] text-muted truncate leading-tight">{atName}</span>

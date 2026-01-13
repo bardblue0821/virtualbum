@@ -2,7 +2,7 @@ import { db } from '../firebase'
 import { COL } from '../paths'
 import { collection, addDoc, query, where, orderBy, limit, writeBatch, doc, setDoc } from 'firebase/firestore'
 
-export type NotificationType = 'comment'|'like'|'image'|'friend_request'|'watch'|'repost'|'reaction'
+export type NotificationType = 'comment'|'like'|'image'|'friend_request'|'friend_accepted'|'watch'|'repost'|'reaction'
 
 export interface NotificationInput {
   userId: string          // 受信者
@@ -24,6 +24,7 @@ function buildMessage(p: NotificationInput): string {
     case 'like': return 'アルバムにいいねが付きました'
     case 'image': return 'アルバムに画像が追加されました'
     case 'friend_request': return 'フレンド申請が届きました'
+    case 'friend_accepted': return 'フレンド申請が承認されました'
     case 'watch': return 'あなたがウォッチされました'
     case 'repost': return 'あなたの投稿がリポストされました'
     case 'reaction': return 'リアクションが付きました'
@@ -52,14 +53,27 @@ export async function listNotifications(userId: string, limitCount = 100){
 }
 
 export async function markAllRead(userId: string){
-  const q = query(collection(db, COL.notifications), where('userId','==', userId), where('readAt','==', null))
-  const { getDocs } = await import('firebase/firestore')
-  const snap = await getDocs(q)
-  if (snap.empty) return
-  const batch = writeBatch(db)
-  const now = new Date()
-  snap.forEach(docSnap => batch.update(doc(db, COL.notifications, docSnap.id), { readAt: now }))
-  await batch.commit()
+  try {
+    const q = query(collection(db, COL.notifications), where('userId','==', userId), where('readAt','==', null))
+    const { getDocs } = await import('firebase/firestore')
+    const snap = await getDocs(q)
+    if (snap.empty) {
+      console.log('[markAllRead] No unread notifications found')
+      return
+    }
+    console.log('[markAllRead] Found', snap.size, 'unread notifications')
+    const batch = writeBatch(db)
+    const now = new Date()
+    snap.forEach(docSnap => {
+      // readAt のみを更新（他のフィールドはそのまま維持される）
+      batch.update(doc(db, COL.notifications, docSnap.id), { readAt: now })
+    })
+    await batch.commit()
+    console.log('[markAllRead] Successfully marked all as read')
+  } catch (err) {
+    console.error('[markAllRead] Error:', err)
+    throw err
+  }
 }
 
 export async function subscribeNotifications(userId: string, onNext: (rows: any[]) => void, onError?: (e:any)=>void){

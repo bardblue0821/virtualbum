@@ -215,17 +215,18 @@ service cloud.firestore {
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.keys().hasAll(['userId','actorId','type','message','createdAt','readAt'])
         && request.resource.data.readAt == null
-        && request.resource.data.type in ['comment','like','image','friend_request','watch','repost','reaction'];
+        && request.resource.data.type in ['comment','like','image','image_added','friend_request','friend_accepted','watch','repost','reaction'];
+      // update: 自分宛ての通知の readAt のみ更新可能（未読→既読への変更のみ）
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
-        && request.resource.data.keys().hasOnly(['userId','actorId','type','message','createdAt','readAt','albumId','imageId','commentId','friendRequestId','watchId','id'])
+        && resource.data.readAt == null
+        && request.resource.data.readAt != null
+        // 他のフィールドは変更されていないこと
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.actorId == resource.data.actorId
         && request.resource.data.type == resource.data.type
         && request.resource.data.message == resource.data.message
-        && request.resource.data.createdAt == resource.data.createdAt
-        && resource.data.readAt == null
-        && request.resource.data.readAt != null;
+        && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if false; 
     }
 

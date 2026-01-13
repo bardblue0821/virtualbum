@@ -27,7 +27,7 @@ import MuteButton from '../../../components/user/MuteButton';
 import { buildProfilePatch } from '../../../src/services/profile/buildPatch';
 import { TimelineItem } from '../../../components/timeline/TimelineItem';
 import GalleryGrid, { type PhotoItem } from '../../../components/gallery/GalleryGrid';
-import { listImages, listImagesByUploaderPage } from '../../../lib/repos/imageRepo';
+import { listImages, listImagesByUploaderPage, countImagesByUploader } from '../../../lib/repos/imageRepo';
 import { listComments } from '../../../lib/repos/commentRepo';
 import { countLikes, hasLiked, toggleLike } from '../../../lib/repos/likeRepo';
 import { listReactionsByAlbum, toggleReaction } from '../../../lib/repos/reactionRepo';
@@ -64,7 +64,7 @@ export default function ProfilePage() {
   const [ownAlbums, setOwnAlbums] = useState<any[] | null>(null);
   const [joinedAlbums, setJoinedAlbums] = useState<any[] | null>(null);
   const [userComments, setUserComments] = useState<any[] | null>(null);
-  const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number } | null>(null);
+  const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number; imageCount: number } | null>(null);
   // Social counts & lists
   const [watchersCount, setWatchersCount] = useState<number>(0);
   const [friendsCount, setFriendsCount] = useState<number>(0);
@@ -206,11 +206,14 @@ export default function ProfilePage() {
     (async () => {
       setLoadingExtra(true); setExtraError(null);
       try {
-        const own = await listAlbumsByOwner(profile.uid);
-        const joinedIds = await listAlbumIdsByUploader(profile.uid);
+        const [own, joinedIds, comments, imageCount] = await Promise.all([
+          listAlbumsByOwner(profile.uid),
+          listAlbumIdsByUploader(profile.uid),
+          listCommentsByUser(profile.uid, 50),
+          countImagesByUploader(profile.uid),
+        ]);
         const filteredIds = joinedIds.filter(id => !own.some(a => a.id === id));
         const joined = await Promise.all(filteredIds.map(id => getAlbum(id)));
-        const comments = await listCommentsByUser(profile.uid, 50);
         // watchers/friends counts
         let watcherIds: string[] = [];
         let friendOtherIds: string[] = [];
@@ -225,7 +228,7 @@ export default function ProfilePage() {
           setOwnAlbums(own);
           setJoinedAlbums(joined.filter(a => !!a));
           setUserComments(comments);
-          setStats({ ownCount: own.length, joinedCount: filteredIds.length, commentCount: comments.length });
+          setStats({ ownCount: own.length, joinedCount: filteredIds.length, commentCount: comments.length, imageCount });
           setWatchersCount(watcherIds.length);
           setFriendsCount(friendOtherIds.length);
           watchersIdsRef.current = watcherIds;
@@ -1289,7 +1292,7 @@ export default function ProfilePage() {
               aria-selected={listTab==='images'}
               className={`${listTab==='images' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
               onClick={()=> setListTab('images')}
-            >投稿画像 <span className="text-xs text-muted ml-1">({uploadedLoading ? '…' : (uploadedPhotos ? uploadedPhotos.length : '-')})</span></button>
+            >投稿画像 <span className="text-xs text-muted ml-1">({uploadedPhotos ? uploadedPhotos.length : (stats?.imageCount ?? '-')})</span></button>
           </div>
 
           {/* Panels */}

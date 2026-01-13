@@ -7,7 +7,7 @@ import { listImages } from "@/lib/repos/imageRepo";
 import { listComments } from "@/lib/repos/commentRepo";
 import { countLikes, hasLiked } from "@/lib/repos/likeRepo";
 import { listReactionsByAlbum } from "@/lib/repos/reactionRepo";
-import { countReposts, hasReposted, getRepost, listRepostsByAlbumRaw } from "@/lib/repos/repostRepo";
+import { countReposts, hasReposted, getRepost, listRepostsByAlbumRaw, listRecentRepostsByUsers } from "@/lib/repos/repostRepo";
 import { getAlbum } from "@/lib/repos/albumRepo";
 import { batchGetUsers } from "@/lib/utils/batchQuery";
 import { createLogger } from "@/lib/logger";
@@ -88,18 +88,42 @@ export async function listLatestAlbumsVMLimited(
   // Map albumId -> latest repost info by friends/watchers/self（アルバム単位で取得：ルールと整合）
   const latestRepostByAlbum = new Map<string, { userId: string; createdAt: any }>();
 
+  // ★ フレンド/ウォッチのリポストを先に取得（ブロック・ミュートは除外済みのownerIds）
+  try {
+    const recentReposts = await listRecentRepostsByUsers(ownerIds, 30);
+    for (const rp of recentReposts) {
+      if (!latestRepostByAlbum.has(rp.albumId)) {
+        latestRepostByAlbum.set(rp.albumId, { userId: rp.userId, createdAt: rp.createdAt });
+      }
+    }
+  } catch (e) {
+    log.warn('listRecentRepostsByUsers failed', e);
+  }
+
   // Ensure albums referenced only by reposts are included as well
   const albumIdSet = new Set(albums.map((a: any) => a.id));
   const missingIds = Array.from(latestRepostByAlbum.keys()).filter(id => !albumIdSet.has(id));
   const missingAlbums = await Promise.all(missingIds.map(id => getAlbum(id)));
   const mergedAlbums = [...albums, ...missingAlbums.filter(a => !!a)];
-  // Filter private albums: only owner or friends can see
+  
+  // リポストされたアルバムのIDセット（リポスト経由のアルバムは公開なら表示）
+  const repostedAlbumIds = new Set(latestRepostByAlbum.keys());
+  
+  // Filter albums:
+  // - ブロック/ミュート対象のオーナーは除外
+  // - friends アルバムはオーナーまたはフレンドのみ
+  // - リポスト経由の公開アルバムは表示
   const filteredAlbums = mergedAlbums.filter((a: any) => {
+    // ブロック・ミュート対象のオーナーは除外
+    if (blockedSet.has(a.ownerId) || mutedSet.has(a.ownerId)) return false;
+    
     const vis = a?.visibility;
     if (vis === 'friends') {
+      // friendsアルバムはオーナーまたはフレンドのみ表示可能
       return (a.ownerId === currentUserId) || friendOwnerSet.has(a.ownerId);
     }
-    return true; // default public
+    // 公開アルバムは表示（リポスト経由含む）
+    return true;
   });
 
   // ここでアルバムごとにリポスト行を取得し、友人/ウォッチ（含む自分）の最新を採用

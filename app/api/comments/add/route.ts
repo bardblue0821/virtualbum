@@ -63,9 +63,11 @@ export async function POST(req: NextRequest) {
       }
     }
     
-  await adminAddComment(albumId, userId, body);
+    await adminAddComment(albumId, userId, body);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });
+    console.error('[comments/add] Error:', e);
+    const errorDetail = process.env.NODE_ENV !== 'production' ? e?.stack || e?.message : undefined;
+    return NextResponse.json({ error: e?.message || 'UNKNOWN', detail: errorDetail }, { status: 500 });
   }
 }

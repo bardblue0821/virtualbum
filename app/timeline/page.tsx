@@ -570,6 +570,33 @@ export default function TimelinePage() {
   async function handleSubmitComment(albumId: string, text: string) {
     if (!user) return;
     const { addComment } = await import("../../lib/repos/commentRepo");
+    
+    // 即時反映: 自分のコメントをローカルに追加
+    const newComment = {
+      body: text,
+      userId: user.uid,
+      user: {
+        uid: user.uid,
+        handle: null, // 自分のハンドルはキャッシュから取得できれば設定
+        iconURL: user.photoURL || null,
+        displayName: user.displayName || '',
+      },
+      createdAt: new Date(),
+    };
+    
+    setRows((prev) => prev.map((r) => {
+      if (r.album.id !== albumId) return r;
+      const currentPreview = r.commentsPreview || [];
+      // 最新3件を維持（新しいコメントを先頭に追加し、3件に制限）
+      const updatedPreview = [newComment, ...currentPreview].slice(0, 3);
+      return {
+        ...r,
+        commentsPreview: updatedPreview,
+        commentCount: (r.commentCount || 0) + 1,
+      } as TimelineItemVM;
+    }));
+    
+    // サーバーにコメントを送信
     try {
       const token = await user.getIdToken();
       const res = await fetch('/api/comments/add', {

@@ -47,11 +47,17 @@ export async function acceptFriend(userId: string, targetId: string) {
     throw ErrorHelpers.duplicate('承認済みのフレンド');
   }
   await updateDoc(ref, { status: 'accepted' });
-  // 通知: 承認したことを申請元に知らせる（任意：ここでは送らない。必要なら下記コメント外）
-  // try {
-  //   const { addNotification } = await import('./notificationRepo');
-  //   await addNotification({ userId, actorId: targetId, type: 'friend_request', friendRequestId: id, message: 'フレンド申請が承認されました' });
-  // } catch {}
+  // 通知: 承認したことを申請元に知らせる
+  try {
+    const { addNotification } = await import('./notificationRepo');
+    await addNotification({ 
+      userId, 
+      actorId: targetId, 
+      type: 'friend_accepted' as any, 
+      friendRequestId: id, 
+      message: 'フレンド申請が承認されました' 
+    });
+  } catch (e) { /* 通知失敗は無視 */ }
 }
 
 export async function getFriendStatus(userId: string, targetId: string) {

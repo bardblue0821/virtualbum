@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { auth } from '../lib/firebase';
 import { ensureUser } from '../lib/authUser';
 import { Button } from './ui/Button';
+import EmailConfirmModal from './ui/EmailConfirmModal';
 import { isHandleTaken } from '../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason } from '../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
@@ -16,7 +17,7 @@ function hasNonAscii(input: string): boolean {
   return /[^\x20-\x7E]/.test(input);
 }
 
-function mapAuthError(code: string): string {
+function mapAuthError(code: string, originalMessage?: string): string {
   switch (code) {
     case 'auth/invalid-email':
       return 'メールアドレス形式が正しくありません';
@@ -25,13 +26,24 @@ function mapAuthError(code: string): string {
     case 'auth/popup-closed-by-user':
       return 'ポップアップが閉じられました';
     case 'auth/email-already-in-use':
+      return 'このメールアドレスは既に使用されています';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-login-credentials':
     case 'auth/invalid-credential':
-    case 'auth/too-many-requests':
       return '認証に失敗しました';
+    case 'auth/too-many-requests':
+      return 'リクエストが多すぎます。しばらく待ってから再試行してください';
+    case 'auth/operation-not-allowed':
+      return 'この認証方法は許可されていません。管理者に連絡してください';
+    case 'auth/network-request-failed':
+      return 'ネットワークエラーが発生しました。接続を確認してください';
     default:
+      // 開発環境ではより詳細なエラー情報を表示
+      if (process.env.NODE_ENV !== 'production' && originalMessage) {
+        console.error('[Auth Error]', code, originalMessage);
+        return `認証に失敗しました (${code})`;
+      }
       return '認証に失敗しました';
   }
 }
@@ -53,6 +65,8 @@ export default function AuthForm() {
   const [handle, setHandle] = useState('');
   const [handleStatus, setHandleStatus] = useState<'idle'|'checking'|'ok'|'taken'|'invalid'>('idle');
   const [handleError, setHandleError] = useState<string | null>(null);
+  const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -138,7 +152,9 @@ export default function AuthForm() {
         await ensureUser(cred.user.uid, displayName, cred.user.email, handle);
         await sendEmailVerification(cred.user);
         await signOut(auth);
-        setInfo('仮登録です。メール内のリンクをクリックして本登録を完了してください。');
+        // モーダルを表示（メールアドレスを保存）
+        setRegisteredEmail(email);
+        setShowEmailConfirmModal(true);
       } else {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
@@ -146,7 +162,7 @@ export default function AuthForm() {
         router.push('/timeline');
       }
     } catch (err: any) {
-      setError(mapAuthError(err.code || 'unknown'));
+      setError(mapAuthError(err.code || 'unknown', err.message));
     } finally {
       setLoading(false);
     }
@@ -161,7 +177,7 @@ export default function AuthForm() {
       setInfo('Google ログイン成功');
       router.push('/timeline');
     } catch (err: any) {
-      setError(mapAuthError(err.code || 'unknown'));
+      setError(mapAuthError(err.code || 'unknown', err.message));
     } finally {
       setLoading(false);
     }
@@ -211,7 +227,19 @@ export default function AuthForm() {
     return ()=>{ active=false; clearTimeout(t); };
   }, [handle, mode]);
 
+  // メール確認モーダルを閉じた時のハンドラ
+  function handleEmailConfirmModalClose() {
+    setShowEmailConfirmModal(false);
+    router.push('/');
+  }
+
   return (
+    <>
+    <EmailConfirmModal
+      open={showEmailConfirmModal}
+      email={registeredEmail}
+      onClose={handleEmailConfirmModalClose}
+    />
     <div className="w-full max-w-md mx-auto p-6">
       <h1 className="text-3xl font-bold my-6 text-teal-500 text-center">Virtualbum</h1>
       <div className="flex gap-2 mb-4">
@@ -341,5 +369,6 @@ export default function AuthForm() {
         </Button>
       </div>
     </div>
+    </>
   );
 }
