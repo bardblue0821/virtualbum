@@ -10,6 +10,8 @@ import { useToast } from './ui/Toast';
 import AlbumImageCropper from './upload/AlbumImageCropper';
 import { getCroppedBlobSized } from '@/src/services/avatar';
 import { Button as AppButton } from './ui/Button';
+import TagInput from './form/TagInput';
+import { updateAlbumTags, getAllAlbumTags } from '../lib/repos/tagRepo';
 
 const MAX_IMAGES = 4;
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -25,6 +27,8 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   const [placeUrl, setPlaceUrl] = useState('');
   const [comment, setComment] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'friends'>('public');
+  const [albumTags, setAlbumTags] = useState<string[]>([]);
+  const [tagCandidates, setTagCandidates] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<{ file: File; url: string }[]>([]);
   const [croppedPreviews, setCroppedPreviews] = useState<({ file: File; url: string } | null)[]>([]);
@@ -51,6 +55,11 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   }, []);
 
   const [isDragging, setIsDragging] = useState(false);
+
+  // タグ候補を読み込む
+  useEffect(() => {
+    getAllAlbumTags(100).then(setTagCandidates).catch(() => {});
+  }, []);
 
   // ファイル追加処理（共通）
   function addFiles(fileList: FileList | File[]) {
@@ -238,6 +247,16 @@ export default function AlbumCreateModal({ onCreated }: Props) {
         }
       );
       setProgress(100);
+
+      // タグを保存（アルバム作成後）
+      if (albumTags.length > 0) {
+        try {
+          await updateAlbumTags(albumId, albumTags, user.uid);
+        } catch (e) {
+          console.warn('[AlbumCreateModal] Failed to save tags', e);
+        }
+      }
+
       if (onCreated) onCreated(albumId);
       console.log('[AlbumCreateModal] success', { albumId });
       // 画面遷移時にトーストを表示
@@ -324,6 +343,23 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             フレンド限定にすると、ウォッチャーや非フレンドには完全に表示されません。共有・リポストも無効になります。
           </p>
         </div>
+
+        {/* タグ入力 */}
+        <div>
+          <label className="block text-sm text-muted mb-1">タグ（最大5つ）</label>
+          <TagInput
+            tags={albumTags}
+            onChange={setAlbumTags}
+            candidates={tagCandidates}
+            placeholder="タグを入力（Enterで追加）"
+            maxTags={5}
+            disabled={loading || !user}
+          />
+          <p className="text-xs text-muted mt-1">
+            タグは検索で使用されます。日本語・英数字・アンダースコアが使えます。
+          </p>
+        </div>
+
         <div>
           {/* Hidden file input */}
           <input

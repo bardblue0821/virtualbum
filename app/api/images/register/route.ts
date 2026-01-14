@@ -57,8 +57,9 @@ export async function POST(req: NextRequest) {
     const userId = json?.userId as string | undefined;
     const url = json?.url as string | undefined;
     const thumbUrl = json?.thumbUrl as string | undefined;
+    const alt = json?.alt as string | undefined;
     
-    log.debug('request:', { albumId, userId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
+    log.debug('request:', { albumId, userId, hasUrl: !!url, hasThumbUrl: !!thumbUrl, hasAlt: !!alt });
     
     if (!albumId || !userId || !url) {
       log.warn('invalid input:', { albumId, userId, hasUrl: !!url });
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     // Admin SDK で Firestore に登録
     log.debug('calling adminAddImage');
-    await adminAddImage(albumId, userId, url, thumbUrl);
+    await adminAddImage(albumId, userId, url, thumbUrl, alt);
     
     log.debug('success');
     return NextResponse.json({ ok: true });

@@ -14,4 +14,7 @@ export const COL = {
   blockedUsers: 'blockedUsers',
   // サブコレクション: users/{userId}/mutedUsers
   mutedUsers: 'mutedUsers',
+  // タグ関連
+  userTags: 'userTags',
+  albumTags: 'albumTags',
 } as const

@@ -31,7 +31,7 @@ function mapAuthError(code: string, originalMessage?: string): string {
     case 'auth/wrong-password':
     case 'auth/invalid-login-credentials':
     case 'auth/invalid-credential':
-      return '認証に失敗しました';
+      return '入力された情報に誤りがあります';
     case 'auth/too-many-requests':
       return 'リクエストが多すぎます。しばらく待ってから再試行してください';
     case 'auth/operation-not-allowed':
@@ -42,9 +42,9 @@ function mapAuthError(code: string, originalMessage?: string): string {
       // 開発環境ではより詳細なエラー情報を表示
       if (process.env.NODE_ENV !== 'production' && originalMessage) {
         console.error('[Auth Error]', code, originalMessage);
-        return `認証に失敗しました (${code})`;
+        return `入力された情報に誤りがあります (${code})`;
       }
-      return '認証に失敗しました';
+      return '入力された情報に誤りがあります';
   }
 }
 
@@ -67,13 +67,17 @@ export default function AuthForm() {
   const [handleError, setHandleError] = useState<string | null>(null);
   const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false); // 登録処理中フラグ
 
   useEffect(() => {
+    // 登録処理中または確認モーダル表示中はリダイレクトしない
+    if (isRegistering || showEmailConfirmModal) return;
+    
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u) router.replace('/timeline');
     });
     return () => unsub();
-  }, [router]);
+  }, [router, isRegistering, showEmailConfirmModal]);
 
   // Twitter リダイレクト認証の結果を処理
   useEffect(() => {
@@ -148,6 +152,7 @@ export default function AuthForm() {
     if (!validate()) return; setLoading(true);
     try {
       if (mode === 'register') {
+        setIsRegistering(true); // 登録開始フラグ
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await ensureUser(cred.user.uid, displayName, cred.user.email, handle);
         await sendEmailVerification(cred.user);
@@ -155,6 +160,7 @@ export default function AuthForm() {
         // モーダルを表示（メールアドレスを保存）
         setRegisteredEmail(email);
         setShowEmailConfirmModal(true);
+        setIsRegistering(false);
       } else {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
@@ -162,6 +168,7 @@ export default function AuthForm() {
         router.push('/timeline');
       }
     } catch (err: any) {
+      setIsRegistering(false);
       setError(mapAuthError(err.code || 'unknown', err.message));
     } finally {
       setLoading(false);
@@ -230,7 +237,8 @@ export default function AuthForm() {
   // メール確認モーダルを閉じた時のハンドラ
   function handleEmailConfirmModalClose() {
     setShowEmailConfirmModal(false);
-    router.push('/');
+    // ページをリロードしてログイン画面に戻る（入力内容をクリア）
+    window.location.reload();
   }
 
   return (
@@ -239,6 +247,7 @@ export default function AuthForm() {
       open={showEmailConfirmModal}
       email={registeredEmail}
       onClose={handleEmailConfirmModalClose}
+      onConfirm={handleEmailConfirmModalClose}
     />
     <div className="w-full max-w-md mx-auto p-6">
       <h1 className="text-3xl font-bold my-6 text-teal-500 text-center">Virtualbum</h1>
@@ -319,7 +328,7 @@ export default function AuthForm() {
           )}
           {mode === 'login' && (
             <div className="mt-2">
-              <Link href="/forgot-password" className="text-xs link-accent">
+              <Link href="/settings/forgot-password" className="text-xs link-accent">
                 パスワードを忘れた方
               </Link>
             </div>

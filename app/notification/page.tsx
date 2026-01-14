@@ -23,6 +23,17 @@ interface NotificationRow {
   commentBody?: string; // コメント本文
 }
 
+// グループ化された通知
+interface GroupedNotification {
+  key: string;
+  type: string;
+  albumId?: string;
+  notifications: NotificationRow[];
+  latestCreatedAt: any;
+  actors: string[];
+  isUnread: boolean;
+}
+
 // 通知タイプごとの絵文字
 function getNotificationEmoji(type: string): string {
   switch (type) {
@@ -45,7 +56,60 @@ export default function NotificationsPage(){
   const [friendState, setFriendState] = useState<Record<string, 'pending'|'accepted'|'none'>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
+  const [groupMode, setGroupMode] = useState(true); // まとめ表示モード
   const { show } = useToast();
+
+  // 通知をグループ化する関数
+  function groupNotifications(notifications: NotificationRow[]): GroupedNotification[] {
+    const groups: Record<string, GroupedNotification> = {};
+    
+    for (const n of notifications) {
+      // グループキー: タイプ + アルバムID（または 'user' for watch/friend_request）
+      const groupKey = n.albumId 
+        ? `${n.type}:${n.albumId}`
+        : `${n.type}:user:${n.actorId}`;
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          key: groupKey,
+          type: n.type,
+          albumId: n.albumId,
+          notifications: [],
+          latestCreatedAt: n.createdAt,
+          actors: [],
+          isUnread: false,
+        };
+      }
+      
+      groups[groupKey].notifications.push(n);
+      if (!groups[groupKey].actors.includes(n.actorId)) {
+        groups[groupKey].actors.push(n.actorId);
+      }
+      if (!n.readAt) {
+        groups[groupKey].isUnread = true;
+      }
+      // 最新の日時を保持
+      const nTime = toMillis(n.createdAt);
+      const currentTime = toMillis(groups[groupKey].latestCreatedAt);
+      if (nTime > currentTime) {
+        groups[groupKey].latestCreatedAt = n.createdAt;
+      }
+    }
+    
+    // 最新順にソート
+    return Object.values(groups).sort((a, b) => 
+      toMillis(b.latestCreatedAt) - toMillis(a.latestCreatedAt)
+    );
+  }
+
+  function toMillis(v: any): number {
+    if (!v) return 0;
+    if (v instanceof Date) return v.getTime();
+    if (typeof v?.toDate === 'function') return v.toDate().getTime();
+    if (typeof v === 'object' && typeof v.seconds === 'number') return v.seconds * 1000;
+    if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
+    return 0;
+  }
 
   // フレンド申請承認/拒否アクション（即時UI反映）
   async function handleAccept(actorId: string){
@@ -139,12 +203,105 @@ export default function NotificationsPage(){
 
   if (!user) return <div className="max-w-2xl mx-auto p-4"><p className="text-sm fg-muted">ログインしてください。</p></div>;
 
+  const grouped = groupNotifications(rows);
+
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-semibold mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">通知</h1>
+      <div className="flex items-center justify-between mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">
+        <h1 className="text-2xl font-semibold">通知</h1>
+        <button
+          type="button"
+          onClick={() => setGroupMode(!groupMode)}
+          className={`px-3 py-1 rounded-full text-xs transition-colors ${
+            groupMode 
+              ? 'bg-[var(--accent)] text-white' 
+              : 'bg-muted/10 text-foreground hover:bg-muted/20'
+          }`}
+        >
+          {groupMode ? 'まとめ表示' : '個別表示'}
+        </button>
+      </div>
   {loading && <p className="text-sm fg-subtle">読み込み中...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
   {!loading && rows.length === 0 && <p className="text-sm fg-subtle">通知はありません。</p>}
+
+      {/* グループ表示モード */}
+      {groupMode && grouped.length > 0 && (
+        <ul className="divide-y divide-line">
+          {grouped.map(g => {
+            const firstNotification = g.notifications[0];
+            const firstActor = actors[firstNotification.actorId];
+            const targetHref = getNotificationHref(firstNotification, firstActor);
+            const actorCount = g.actors.length;
+            const notificationCount = g.notifications.length;
+            
+            // 複数のアクターがいる場合の表示
+            const actorNames = g.actors.slice(0, 3).map(aid => {
+              const a = actors[aid];
+              return a?.displayName || a?.handle || aid.slice(0, 6);
+            }).join('、');
+            const remainingActors = actorCount > 3 ? `他${actorCount - 3}人` : '';
+            
+            return (
+              <li key={g.key} className={`py-3 text-sm ${g.isUnread ? 'surface-alt' : ''}`}>
+                <div className="flex flex-col items-start gap-2">
+                  <div className="flex items-center gap-2">
+                    {/* 複数アイコンを重ねて表示 */}
+                    <div className="flex -space-x-2">
+                      {g.actors.slice(0, 3).map((aid, idx) => {
+                        const a = actors[aid];
+                        return a?.iconURL ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img 
+                            key={aid}
+                            src={a.iconURL} 
+                            alt="" 
+                            className="h-10 w-10 rounded-md object-cover border-2 border-background"
+                            style={{ zIndex: 3 - idx }}
+                          />
+                        ) : (
+                          <span 
+                            key={aid}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-md surface-alt text-[12px] fg-muted border-2 border-background"
+                            style={{ zIndex: 3 - idx }}
+                          >
+                            {(a?.displayName || '?').slice(0,1)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <span className="text-xl" aria-label={g.type}>{getNotificationEmoji(g.type)}</span>
+                    {notificationCount > 1 && (
+                      <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">
+                        {notificationCount}件
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-start justify-between gap-2 w-full">
+                    <div className="space-y-1">
+                      {targetHref ? (
+                        <Link href={targetHref} className="text-foreground hover:text-foreground">
+                          <span className="font-medium">{actorNames}{remainingActors && `、${remainingActors}`}</span>
+                          {formatGroupActionText(g)}
+                        </Link>
+                      ) : (
+                        <p>
+                          <span className="font-medium">{actorNames}{remainingActors && `、${remainingActors}`}</span>
+                          {formatGroupActionText(g)}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-muted">{formatDate(g.latestCreatedAt)}</p>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* 個別表示モード */}
+      {!groupMode && rows.length > 0 && (
       <ul className="divide-y divide-line">
         {rows.map(r => {
           const isUnread = !r.readAt;
@@ -217,6 +374,7 @@ export default function NotificationsPage(){
           );
         })}
       </ul>
+      )}
     </div>
   );
 }
@@ -275,6 +433,38 @@ function formatActionText(r: NotificationRow){
     case 'repost': return `${target}リポストしました。`;
     case 'reaction': return `${target}リアクションしました。`;
     default: return `アクションがありました。`;
+  }
+}
+
+// グループ化された通知のアクションテキスト
+function formatGroupActionText(g: GroupedNotification): string {
+  const count = g.notifications.length;
+  const actorCount = g.actors.length;
+  const target = g.albumId ? 'あなたのアルバムに' : '';
+  
+  switch(g.type){
+    case 'like':
+      return actorCount > 1 
+        ? `が${target}いいねしました。` 
+        : `が${target}いいねしました。`;
+    case 'comment':
+      return count > 1 
+        ? `が${target}${count}件コメントしました。`
+        : `が${target}コメントしました。`;
+    case 'repost':
+      return `が${target}リポストしました。`;
+    case 'reaction':
+      return `が${target}リアクションしました。`;
+    case 'image_added':
+      return count > 1
+        ? `が${count}件の画像を追加しました。`
+        : `が画像を追加しました。`;
+    case 'friend_request':
+      return `がフレンド申請しました。`;
+    case 'watch':
+      return `があなたをウォッチしました。`;
+    default:
+      return `がアクションしました。`;
   }
 }
 

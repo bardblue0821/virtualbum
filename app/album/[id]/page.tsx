@@ -16,6 +16,7 @@ import { useAlbumAccess } from "@/src/hooks/useAlbumAccess";
 import { REACTION_CATEGORIES } from "@/lib/constants/reactions";
 import { listImages } from "@/lib/repos/imageRepo";
 import { listAcceptedFriends } from "@/lib/repos/friendRepo";
+import { getAllAlbumTags, updateAlbumTags } from "@/lib/repos/tagRepo";
 
 // 分割したカスタムフック
 import {
@@ -148,6 +149,19 @@ export default function AlbumDetailPage() {
   // 画像管理モーダル
   const [imageManageModalOpen, setImageManageModalOpen] = useState(false);
 
+  // タグ候補
+  const [tagCandidates, setTagCandidates] = useState<string[]>([]);
+  useEffect(() => {
+    getAllAlbumTags(100).then(setTagCandidates).catch(() => {});
+  }, []);
+
+  // タグ更新ハンドラ
+  const handleTagsChange = async (newTags: string[]) => {
+    if (!albumId || !user?.uid) return;
+    await updateAlbumTags(albumId, newTags, user.uid);
+    setAlbum((prev: any) => (prev ? { ...prev, tags: newTags } : prev));
+  };
+
   // ログインユーザーのフレンドIDセット
   const [myFriendIds, setMyFriendIds] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -247,6 +261,9 @@ export default function AlbumDetailPage() {
         onPlaceUrlBlur={savePlaceUrlIfChanged}
         onInputKeyDownBlurOnEnter={handleInputKeyDownBlurOnEnter}
         onVisibilityChange={handleChangeVisibility}
+        tags={album.tags || []}
+        tagCandidates={tagCandidates}
+        onTagsChange={handleTagsChange}
       />
 
       {/* 参加ユーザーのアイコン一覧 */}

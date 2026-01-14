@@ -17,6 +17,7 @@ export async function getAlbumDetailVM(albumId: string, currentUserId?: string, 
     title: snap.title ?? null,
     placeUrl: snap.placeUrl ?? null,
     visibility: (snap.visibility === 'friends' ? 'friends' : 'public'),
+    tags: Array.isArray(snap.tags) ? snap.tags : [],
   };
   const imgsRaw = await listImages(albumId);
   const images: ImgVM[] = (imgsRaw || [])

@@ -21,6 +21,10 @@ import { listAcceptedFriends } from "../../lib/repos/friendRepo";
 import { listWatchedOwnerIds } from "../../lib/repos/watchRepo";
 import { getMutedUserIds } from "../../lib/repos/muteRepo";
 
+// フィルタータイプ
+type FilterType = 'all' | 'friends' | 'watched';
+const FILTER_STORAGE_KEY = 'virtualbum:timeline:filter';
+
 
 export default function TimelinePage() {
   const { user } = useAuthUser();
@@ -49,6 +53,52 @@ export default function TimelinePage() {
   const loadMoreRef = useRef<() => void>(() => {});
   const [friendSet, setFriendSet] = useState<Set<string>>(new Set());
   const [watchSet, setWatchSet] = useState<Set<string>>(new Set());
+
+  // フィルター状態（localStorageから復元）
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [tagFilter, setTagFilter] = useState<string>(''); // タグフィルター
+  const [showFilterPopover, setShowFilterPopover] = useState(false); // フィルターポップオーバー表示
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(FILTER_STORAGE_KEY);
+      if (saved === 'friends' || saved === 'watched' || saved === 'all') {
+        setFilter(saved);
+      }
+      const savedTag = localStorage.getItem('virtualbum:timeline:tagFilter');
+      if (savedTag) setTagFilter(savedTag);
+    } catch {}
+  }, []);
+
+  const handleFilterChange = (newFilter: FilterType) => {
+    setFilter(newFilter);
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, newFilter);
+    } catch {}
+  };
+
+  const handleTagFilterChange = (newTag: string) => {
+    setTagFilter(newTag);
+    try {
+      localStorage.setItem('virtualbum:timeline:tagFilter', newTag);
+    } catch {}
+  };
+
+  // フィルターポップオーバーの外部クリックで閉じる
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (filterPopoverRef.current && !filterPopoverRef.current.contains(e.target as Node)) {
+        setShowFilterPopover(false);
+      }
+    }
+    if (showFilterPopover) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterPopover]);
 
   // ★ ミュートユーザーIDのセット
   const mutedSetRef = useRef<Set<string>>(new Set());
@@ -616,16 +666,161 @@ export default function TimelinePage() {
     }
   }
 
+  // フィルターを適用した行
+  const filteredRows = React.useMemo(() => {
+    let result = rows;
+    
+    // フレンド/ウォッチフィルター
+    if (filter === 'friends') {
+      result = result.filter((r) => {
+        const ownerId = r.album.ownerId;
+        return friendSet.has(ownerId) || ownerId === user?.uid;
+      });
+    } else if (filter === 'watched') {
+      result = result.filter((r) => watchSet.has(r.album.ownerId));
+    }
+    
+    // タグフィルター
+    if (tagFilter.trim()) {
+      const normalizedTag = tagFilter.trim().toLowerCase();
+      result = result.filter((r) => {
+        // アルバムタグをチェック
+        const albumTags = ((r.album as any).tags || []).map((t: string) => t.toLowerCase());
+        if (albumTags.includes(normalizedTag)) return true;
+        
+        // オーナーのタグをチェック（ownerにtagsプロパティがある場合）
+        const ownerTags = ((r.owner as any)?.tags || []).map((t: string) => t.toLowerCase());
+        if (ownerTags.includes(normalizedTag)) return true;
+        
+        return false;
+      });
+    }
+    
+    return result;
+  }, [rows, filter, friendSet, watchSet, user?.uid, tagFilter]);
+
   if (loading && rows.length === 0) return <div className="text-sm text-muted/80">読み込み中...</div>;
   if (error && rows.length === 0) return <div className="text-sm text-red-600">{error}</div>;
 
+  // アクティブなフィルター数を計算
+  const activeFilterCount = (filter !== 'all' ? 1 : 0) + (tagFilter.trim() ? 1 : 0);
+
   return (
     <div className="max-w-2xl mx-auto p-4">
-    <h1 className="text-xl font-semibold mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">タイムライン</h1>
-  {rows.length === 0 && <p className="text-sm text-muted/80">対象アルバムがありません</p>}
-      {rows.length > 0 && (
+    {/* ヘッダー: タイトルとフィルターボタン */}
+    <div className="sticky top-0 z-10 bg-background py-2 border-b border-line flex items-center justify-between mb-4">
+      <h1 className="text-xl font-semibold">タイムライン</h1>
+      {user && (
+        <div className="relative" ref={filterPopoverRef}>
+          <button
+            type="button"
+            onClick={() => setShowFilterPopover((v) => !v)}
+            className={`p-2 rounded-md transition-colors ${
+              showFilterPopover || activeFilterCount > 0
+                ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                : 'hover:bg-muted/10 text-muted'
+            }`}
+            title="フィルター"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+            </svg>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px] bg-[var(--accent)] text-white rounded-full flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* フィルターポップオーバー */}
+          {showFilterPopover && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-background border border-line rounded-lg shadow-lg p-4 space-y-4 z-20">
+              {/* フレンド/ウォッチフィルター */}
+              <div>
+                <span className="text-xs text-muted block mb-2">表示</span>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleFilterChange('all')}
+                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                      filter === 'all'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-muted/10 text-foreground hover:bg-muted/20'
+                    }`}
+                  >
+                    すべて
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFilterChange('friends')}
+                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                      filter === 'friends'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-muted/10 text-foreground hover:bg-muted/20'
+                    }`}
+                  >
+                    フレンド
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFilterChange('watched')}
+                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                      filter === 'watched'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-muted/10 text-foreground hover:bg-muted/20'
+                    }`}
+                  >
+                    ウォッチ
+                  </button>
+                </div>
+              </div>
+
+              {/* タグフィルター */}
+              <div>
+                <span className="text-xs text-muted block mb-2">タグで絞り込み</span>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={tagFilter}
+                    onChange={(e) => handleTagFilterChange(e.target.value)}
+                    placeholder="タグ名..."
+                    className="flex-1 px-3 py-1.5 text-sm border border-line rounded-md bg-background text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+                  />
+                  {tagFilter && (
+                    <button
+                      type="button"
+                      onClick={() => handleTagFilterChange('')}
+                      className="text-xs text-muted hover:text-foreground transition-colors"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* クリアボタン */}
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFilterChange('all');
+                    handleTagFilterChange('');
+                  }}
+                  className="w-full text-sm text-muted hover:text-foreground py-1 transition-colors"
+                >
+                  フィルターをクリア
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+  {filteredRows.length === 0 && <p className="text-sm text-muted/80">対象アルバムがありません</p>}
+      {filteredRows.length > 0 && (
   <div className="divide-y divide-line *:pb-12">
-          {rows.map((row, i) => (
+          {filteredRows.map((row, i) => (
             <TimelineItem
               key={row.repostedBy?.createdAt
                 ? `repost:${row.album.id}:${toMillis(row.repostedBy?.createdAt)}`

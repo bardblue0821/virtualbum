@@ -11,6 +11,7 @@ export type AlbumVM = {
   title?: string | null;
   placeUrl?: string | null;
   visibility?: 'public' | 'friends';
+  tags?: string[];
 };
 
 export type ImgVM = {

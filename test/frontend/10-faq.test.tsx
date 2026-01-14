@@ -5,9 +5,9 @@
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
-import FAQPage from '../../app/faq/page';
+import FAQPage from '../../app/legal/faq/page';
 
-describe('/faq よくある質問ページ', () => {
+describe('/legal/faq よくある質問ページ', () => {
   test('ページタイトル・バージョン・日付が表示される', () => {
     render(<FAQPage />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('よくある質問');

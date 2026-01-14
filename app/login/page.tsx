@@ -324,7 +324,7 @@ export default function LoginPage() {
           </div>
           {mode === 'login' && (
             <div className="mt-2">
-              <Link href="/forgot-password" className="text-xs link-accent">
+              <Link href="/settings/forgot-password" className="text-xs link-accent">
                 パスワードを忘れた方
               </Link>
             </div>

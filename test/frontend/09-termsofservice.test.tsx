@@ -7,11 +7,11 @@ import '@testing-library/jest-dom';
 import React from 'react';
 
 
-import TermsOfServicePage from '../../app/termsofservice/page';
+import TermsOfServicePage from '../../app/legal/termsofservice/page';
 
 // テスト本体
 
-describe('/termsofservice 利用規約ページ', () => {
+describe('/legal/termsofservice 利用規約ページ', () => {
   test('ページタイトル・バージョン・日付が表示される', () => {
   render(<TermsOfServicePage />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('利用規約');

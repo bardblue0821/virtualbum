@@ -1,17 +1,31 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { searchUsersPrefix, searchAlbumsPrefix, searchAlbumsByCommentPrefix, UserHit, AlbumHit } from "../../lib/repos/searchRepo";
+import { searchUsersByTag, searchAlbumsByTagRich } from "../../lib/repos/tagRepo";
 import { translateError } from "../../lib/errors";
 import Avatar from "@/components/profile/Avatar";
 import { SearchAlbumCard } from "@/components/search/SearchAlbumCard";
 
 const PAGE_SIZE = 20;
 
+type SearchCategory = 'all' | 'users' | 'albums' | 'userTags' | 'albumTags';
+
 export default function SearchPage() {
+  const searchParams = useSearchParams();
   const [q, setQ] = useState("");
+  const [category, setCategory] = useState<SearchCategory>('all');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  
+  // URLパラメータから検索クエリを取得
+  useEffect(() => {
+    const query = searchParams?.get('q');
+    if (query) {
+      setQ(query);
+    }
+  }, [searchParams]);
   
   // ユーザー検索
   const [users, setUsers] = useState<UserHit[]>([]);
@@ -24,6 +38,21 @@ export default function SearchPage() {
   const [albumLimit, setAlbumLimit] = useState(PAGE_SIZE);
   const [albumHasMore, setAlbumHasMore] = useState(false);
   const [albumLoadingMore, setAlbumLoadingMore] = useState(false);
+  
+  // タグ検索結果
+  const [userTagResults, setUserTagResults] = useState<Array<{ uid: string; displayName: string; handle: string | null; iconURL: string | null; tags: string[] }>>([]);
+  const [albumTagResults, setAlbumTagResults] = useState<Array<{
+    id: string;
+    title: string;
+    ownerId: string;
+    ownerName: string;
+    ownerHandle: string | null;
+    ownerIconURL: string | null;
+    coverImageURL: string | null;
+    firstImageUrl: string | null;
+    tags: string[];
+    createdAt: any;
+  }>>([]);
   
   const [history, setHistory] = useState<string[]>([]);
   const timer = useRef<number | null>(null);
@@ -67,6 +96,7 @@ export default function SearchPage() {
       setUsers([]); setAlbums([]); setErr(null);
       setUserLimit(PAGE_SIZE); setAlbumLimit(PAGE_SIZE);
       setUserHasMore(false); setAlbumHasMore(false);
+      setUserTagResults([]); setAlbumTagResults([]);
       return;
     }
     const delay = normalized.startsWith("@") ? 120 : 250;
@@ -77,10 +107,12 @@ export default function SearchPage() {
       setUserLimit(PAGE_SIZE);
       setAlbumLimit(PAGE_SIZE);
       try {
-        const [u, a, comm] = await Promise.all([
+        const [u, a, comm, usersByTag, albumsByTag] = await Promise.all([
           searchUsersPrefix(base, PAGE_SIZE + 1),
           searchAlbumsPrefix(base, PAGE_SIZE + 1),
           searchAlbumsByCommentPrefix(base, PAGE_SIZE + 1),
+          searchUsersByTag(base, PAGE_SIZE),
+          searchAlbumsByTagRich(base, PAGE_SIZE),
         ]);
         // アルバム: 本文/説明とコメント由来をマージ
         const byId: Record<string, AlbumHit> = {};
@@ -92,6 +124,8 @@ export default function SearchPage() {
         setUsers(u.slice(0, PAGE_SIZE));
         setAlbumHasMore(albumsMerged.length > PAGE_SIZE);
         setAlbums(albumsMerged.slice(0, PAGE_SIZE));
+        setUserTagResults(usersByTag);
+        setAlbumTagResults(albumsByTag);
       } catch (e: any) {
         setErr(translateError(e));
       } finally {
@@ -204,6 +238,68 @@ export default function SearchPage() {
           placeholder="ユーザー名 / @ハンドル / アルバム名 / 説明 / コメント"
           className="w-full input-underline text-sm"
         />
+        
+        {/* カテゴリ選択 */}
+        {normalized && (
+          <div className="mt-3 flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setCategory('all')}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                category === 'all'
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-muted/10 text-foreground hover:bg-muted/20'
+              }`}
+            >
+              すべて
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategory('users')}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                category === 'users'
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-muted/10 text-foreground hover:bg-muted/20'
+              }`}
+            >
+              ユーザー
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategory('albums')}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                category === 'albums'
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-muted/10 text-foreground hover:bg-muted/20'
+              }`}
+            >
+              アルバム
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategory('userTags')}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                category === 'userTags'
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-muted/10 text-foreground hover:bg-muted/20'
+              }`}
+            >
+              ユーザータグ
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategory('albumTags')}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                category === 'albumTags'
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-muted/10 text-foreground hover:bg-muted/20'
+              }`}
+            >
+              アルバムタグ
+            </button>
+          </div>
+        )}
+        
         {!normalized && history.length > 0 && (
           <div className="mt-2">
             <div className="flex items-center justify-between mb-1">
@@ -229,10 +325,12 @@ export default function SearchPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section>
-          <h2 className="font-medium mb-2">ユーザー {users.length ? `(${users.length})` : ""}</h2>
-          {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
-          {normalized && users.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
+        {/* ユーザー検索結果 */}
+        {(category === 'all' || category === 'users') && (
+          <section>
+            <h2 className="font-medium mb-2">ユーザー {users.length ? `(${users.length})` : ""}</h2>
+            {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
+            {normalized && users.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
           <ul className="space-y-1">
             {users.map((u) => (
               <li key={u.uid}>
@@ -259,7 +357,10 @@ export default function SearchPage() {
           {userHasMore && <div ref={userSentinelRef} className="h-4" />}
           {userLoadingMore && <p className="text-xs fg-subtle mt-1">読み込み中...</p>}
         </section>
+        )}
 
+        {/* アルバム検索結果 */}
+        {(category === 'all' || category === 'albums') && (
         <section>
           <h2 className="font-medium mb-2">アルバム {albums.length ? `(${albums.length})` : ""}</h2>
           {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
@@ -282,6 +383,70 @@ export default function SearchPage() {
           {albumHasMore && <div ref={albumSentinelRef} className="h-4" />}
           {albumLoadingMore && <p className="text-xs fg-subtle mt-1">読み込み中...</p>}
         </section>
+        )}
+
+        {/* タグで見つかったユーザー */}
+        {(category === 'all' || category === 'userTags') && (
+        <section>
+          <h2 className="font-medium mb-2">タグ: ユーザー {userTagResults.length ? `(${userTagResults.length})` : ""}</h2>
+          {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
+          {normalized && userTagResults.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
+          <ul className="space-y-1">
+            {userTagResults.map((u) => (
+              <li key={u.uid}>
+                <Link
+                  href={`/user/${u.handle || u.uid}`}
+                  className="flex items-center gap-3 rounded px-2 py-2 hover-surface-alt"
+                >
+                  <Avatar
+                    size={36}
+                    src={u.iconURL || undefined}
+                    alt={u.displayName ? `${u.displayName}のアイコン` : "ユーザーアイコン"}
+                    interactive={false}
+                    withBorder={false}
+                    className="rounded-full shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{u.displayName || "名前未設定"}</div>
+                    <div className="text-xs fg-subtle truncate">@{u.handle || u.uid.slice(0, 6)}</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {u.tags.map((tag) => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+        )}
+
+        {/* タグで見つかったアルバム */}
+        {(category === 'all' || category === 'albumTags') && (
+        <section>
+          <h2 className="font-medium mb-2">タグ: アルバム {albumTagResults.length ? `(${albumTagResults.length})` : ""}</h2>
+          {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
+          {normalized && albumTagResults.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
+          <div className="divide-y divide-line">
+            {albumTagResults.map((a) => (
+              <SearchAlbumCard
+                key={a.id}
+                id={a.id}
+                title={a.title}
+                ownerId={a.ownerId}
+                ownerName={a.ownerName}
+                ownerHandle={a.ownerHandle || undefined}
+                ownerIconURL={a.ownerIconURL || undefined}
+                createdAt={a.createdAt}
+                firstImageUrl={a.firstImageUrl || undefined}
+              />
+            ))}
+          </div>
+        </section>
+        )}
       </div>
     </div>
   );

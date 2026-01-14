@@ -11,6 +11,7 @@ import { canUploadMoreImages } from "@/lib/repos/imageRepo";
 import { useAuthUser } from "@/src/hooks/useAuthUser";
 import AlbumImageCropper from "./AlbumImageCropper";
 import { getCroppedBlobSized } from "@/src/services/avatar";
+import { needsCompression, compressImage, formatFileSize } from "@/lib/utils/imageCompressor";
 
 type ItemState = {
   file: File;
@@ -20,6 +21,11 @@ type ItemState = {
   uploading: boolean;
   progress: number; // 0-100
   error?: string;
+  needsCompression?: boolean;
+  compressionProgress?: number; // 0-100
+  compressing?: boolean;
+  compressedFile?: File;
+  alt?: string; // ALTテキスト
 };
 
 export default function AlbumImageUploader({
@@ -41,6 +47,10 @@ export default function AlbumImageUploader({
   const [cropIndex, setCropIndex] = useState<number | null>(null);
   const [cropping, setCropping] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  
+  // ALT編集用
+  const [altEditIndex, setAltEditIndex] = useState<number | null>(null);
+  const [altEditValue, setAltEditValue] = useState("");
 
   const itemsRef = useRef<ItemState[]>([]);
   const cropSrcRef = useRef<string | null>(null);
@@ -64,6 +74,31 @@ export default function AlbumImageUploader({
     setCropIndex(null);
     if (cropSrc) URL.revokeObjectURL(cropSrc);
     setCropSrc(null);
+  }
+
+  // ALT編集を開始
+  function openAltEdit(idx: number) {
+    if (busy) return;
+    const it = items[idx];
+    if (!it) return;
+    setAltEditIndex(idx);
+    setAltEditValue(it.alt || "");
+  }
+
+  // ALT編集を保存
+  function saveAltEdit() {
+    if (altEditIndex === null) return;
+    setItems((prev) =>
+      prev.map((x, i) => (i === altEditIndex ? { ...x, alt: altEditValue.trim() || undefined } : x))
+    );
+    setAltEditIndex(null);
+    setAltEditValue("");
+  }
+
+  // ALT編集をキャンセル
+  function cancelAltEdit() {
+    setAltEditIndex(null);
+    setAltEditValue("");
   }
 
   function removeOne(idx: number) {
@@ -102,18 +137,83 @@ export default function AlbumImageUploader({
       toast.warning(`${rejected.length} 件は上限のためスキップされました`);
     }
     clearSelection();
-    const next: ItemState[] = [];
-    for (const f of accepted) {
-      if (f.size > 5 * 1024 * 1024) {
-        toast.error(`${f.name}: サイズ上限 5MB を超えています`);
-        continue;
+    
+    // 各ファイルの圧縮チェックを非同期で実行
+    (async () => {
+      const next: ItemState[] = [];
+      for (const f of accepted) {
+        if (f.size > 10 * 1024 * 1024) {
+          toast.error(`${f.name}: サイズ上限 10MB を超えています`);
+          continue;
+        }
+        try {
+          const url = URL.createObjectURL(f);
+          const checkResult = await needsCompression(f);
+          next.push({ 
+            file: f, 
+            previewUrl: url, 
+            uploading: false, 
+            progress: 0,
+            needsCompression: checkResult.needs,
+            compressionProgress: 0,
+            compressing: false,
+          });
+        } catch {}
       }
-      try {
-        const url = URL.createObjectURL(f);
-        next.push({ file: f, previewUrl: url, uploading: false, progress: 0 });
-      } catch {}
+      setItems(next);
+      
+      // 圧縮が必要なファイルがある場合は警告を表示してから自動で圧縮開始
+      // 少し遅延を入れることで、警告オーバーレイが表示される
+      setTimeout(() => {
+        for (let i = 0; i < next.length; i++) {
+          if (next[i].needsCompression) {
+            compressItem(i);
+          }
+        }
+      }, 500); // 0.5秒遅延で警告を表示
+    })();
+  }
+
+  async function compressItem(idx: number) {
+    const item = items[idx] ?? itemsRef.current[idx];
+    if (!item || item.compressing || item.compressedFile) return;
+
+    setItems((prev) =>
+      prev.map((x, i) => (i === idx ? { ...x, compressing: true, compressionProgress: 0 } : x))
+    );
+
+    try {
+      const result = await compressImage(item.file, {}, (progress) => {
+        setItems((prev) =>
+          prev.map((x, i) => (i === idx ? { ...x, compressionProgress: progress } : x))
+        );
+      });
+
+      setItems((prev) =>
+        prev.map((x, i) =>
+          i === idx
+            ? {
+                ...x,
+                compressing: false,
+                compressionProgress: 100,
+                compressedFile: result.file,
+                needsCompression: false,
+              }
+            : x
+        )
+      );
+
+      toast.success(
+        `${item.file.name} を圧縮しました (${formatFileSize(result.originalSize)} → ${formatFileSize(result.compressedSize)})`
+      );
+    } catch (e: any) {
+      setItems((prev) =>
+        prev.map((x, i) =>
+          i === idx ? { ...x, compressing: false, error: '圧縮に失敗しました' } : x
+        )
+      );
+      toast.error(`${item.file.name}: 圧縮に失敗しました`);
     }
-    setItems(next);
   }
 
   function handleReject(fileRejections: any[]) {
@@ -122,14 +222,14 @@ export default function AlbumImageUploader({
     const tooLarge = rejected
       .map((r) => r?.file as File | undefined)
       .filter((f): f is File => !!f)
-      .filter((f) => f.size > 5 * 1024 * 1024);
+      .filter((f) => f.size > 10 * 1024 * 1024);
 
     if (tooLarge.length > 0) {
       const names = tooLarge.slice(0, 3).map((f) => f.name).join("、");
       const more = tooLarge.length > 3 ? ` ほか${tooLarge.length - 3}件` : "";
-      toast.error(`サイズ上限 5MB を超えています: ${names}${more}`);
+      toast.error(`サイズ上限 10MB を超えています: ${names}${more}`);
     } else if (rejected.length > 0) {
-      toast.error("追加できないファイルがあります（画像のみ / 1枚 5MB まで）");
+      toast.error("追加できないファイルがあります（画像のみ / 1枚 10MB まで）");
     }
   }
 
@@ -278,7 +378,8 @@ export default function AlbumImageUploader({
 
       const prepared = await Promise.all(
         items.map(async (it) => {
-          const srcFile = it.croppedFile ?? it.file;
+          // 優先順位: 圧縮済み > クロップ済み > オリジナル
+          const srcFile = it.compressedFile ?? it.croppedFile ?? it.file;
           const mainBlob = await fileToCanvasBlob(srcFile, 1600, 0.8);
           const thumbBlob = await fileToCanvasBlob(srcFile, 512, 0.7);
           return { it, mainBlob, thumbBlob };
@@ -329,7 +430,7 @@ export default function AlbumImageUploader({
                   'content-type': 'application/json',
                   'authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ albumId, userId, url: mainUrl, thumbUrl: thumbDownloadUrl }),
+                body: JSON.stringify({ albumId, userId, url: mainUrl, thumbUrl: thumbDownloadUrl, alt: p.it.alt }),
               });
               
               console.log('[AlbumImageUploader] API response status:', res.status);
@@ -414,26 +515,26 @@ export default function AlbumImageUploader({
             accept={IMAGE_MIME_TYPE}
             disabled={busy || remaining <= 0}
             multiple
-            maxSize={5 * 1024 * 1024}
+            maxSize={10 * 1024 * 1024}
             className="rounded-md border-2 border-dashed border-base hover:border-(--accent) hover-surface-alt transition-colors cursor-pointer py-10"
           >
             <Group justify="center" mih={120} className="text-center px-2">
               <Dropzone.Accept>
                 <div>
                   <Text fw={700}>ここにドロップして追加</Text>
-                  <Text size="xs" c="dimmed">最大 {remaining} 件 / 1枚 5MB まで</Text>
+                  <Text size="xs" c="dimmed">最大 {remaining} 件 / 1枚 10MB まで（自動圧縮）</Text>
                 </div>
               </Dropzone.Accept>
               <Dropzone.Reject>
                 <div>
                   <Text fw={700} c="red">このファイルは追加できません</Text>
-                  <Text size="xs" c="dimmed">画像のみ（PNG / JPEG / GIF）・1枚 5MB まで</Text>
+                  <Text size="xs" c="dimmed">画像のみ（PNG / JPEG / GIF / WebP）・1枚 10MB まで</Text>
                 </div>
               </Dropzone.Reject>
               <Dropzone.Idle>
                 <div>
                   <Text fw={700}>画像をここにドラッグ＆ドロップ</Text>
-                  <Text size="xs" c="dimmed">またはクリックして選択（最大 {remaining} 件 / 1枚 5MB）</Text>
+                  <Text size="xs" c="dimmed">またはクリックして選択（最大 {remaining} 件 / 4K画像は自動圧縮）</Text>
                 </div>
               </Dropzone.Idle>
             </Group>
@@ -456,7 +557,7 @@ export default function AlbumImageUploader({
                     <button
                       type="button"
                       aria-label={`${it.file.name} を削除`}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600 text-white text-lg leading-none flex items-center justify-center hover:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600 text-white text-lg leading-none flex items-center justify-center hover:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed z-10"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeOne(idx);
@@ -467,7 +568,7 @@ export default function AlbumImageUploader({
                     </button>
 
                     <div
-                      className="cursor-pointer"
+                      className="cursor-pointer relative"
                       onClick={() => openCrop(idx)}
                       role="button"
                       aria-label={`${it.file.name} を切り抜く`}
@@ -480,6 +581,25 @@ export default function AlbumImageUploader({
                         className="overflow-hidden"
                         style={{ height: 120, width: "100%", objectFit: "cover" }}
                       />
+                      
+                      {/* 圧縮警告オーバーレイ */}
+                      {it.needsCompression && !it.compressing && !it.compressedFile && (
+                        <div className="absolute inset-0 flex items-end justify-center bg-black/30 rounded-sm">
+                          <div className="bg-amber-500/90 text-white text-[10px] px-2 py-1 w-full text-center">
+                            ⚠️ 容量が大きいため、圧縮されます
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 圧縮中のオーバーレイ */}
+                      {it.compressing && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-sm">
+                          <div className="text-white text-xs mb-2">圧縮中...</div>
+                          <div className="w-3/4">
+                            <Progress value={it.compressionProgress || 0} color="teal" animated />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-2 min-w-0">
@@ -487,11 +607,29 @@ export default function AlbumImageUploader({
                         {it.file.name}
                       </Text>
                       <Text size="xs" c="dimmed">
-                        {fmtBytes((it.croppedFile ?? it.file).size)}
+                        {it.compressedFile 
+                          ? `${fmtBytes(it.compressedFile.size)} (圧縮済)`
+                          : fmtBytes((it.croppedFile ?? it.file).size)
+                        }
                       </Text>
-                      <Text size="xs" c="dimmed">
-                        クリックで切り抜き
-                      </Text>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Text size="xs" c="dimmed">
+                          クリックで切り抜き
+                        </Text>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openAltEdit(idx); }}
+                          disabled={busy}
+                          className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                            it.alt
+                              ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
+                              : 'border-muted/40 text-muted hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                          } disabled:opacity-50`}
+                          title={it.alt ? `ALT: ${it.alt}` : 'ALTテキストを追加'}
+                        >
+                          {it.alt ? 'ALT ✓' : '+ALT'}
+                        </button>
+                      </div>
                       {it.error && (
                         <Text size="xs" c="red">
                           {it.error}
@@ -549,6 +687,47 @@ export default function AlbumImageUploader({
               onConfirm={(area, _zoom, aspect) => applyCrop(cropIndex, area, aspect)}
             />
             {cropping && <p className="text-xs fg-muted mt-2">切り抜き中...</p>}
+          </div>
+        </div>
+      )}
+
+      {altEditIndex !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={cancelAltEdit}
+        >
+          <div
+            className="surface-alt border border-base rounded shadow-lg w-[min(96vw,400px)] p-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-2 fg-muted hover-surface-alt rounded px-2 py-1 cursor-pointer"
+              onClick={cancelAltEdit}
+              aria-label="閉じる"
+            >
+              ✕
+            </button>
+            <h2 className="text-sm font-semibold mb-3">代替テキスト (ALT) を編集</h2>
+            <p className="text-xs fg-muted mb-2">
+              画像の内容を説明するテキストを入力してください。視覚に障害のある方や画像が読み込めない場合に役立ちます。
+            </p>
+            <textarea
+              className="w-full p-2 border border-base rounded text-sm bg-transparent resize-none"
+              rows={3}
+              placeholder="例: 青い空と白い雲の下に広がる草原"
+              value={altEditValue}
+              onChange={(e) => setAltEditValue(e.target.value)}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <Button variant="ghost" size="sm" onClick={cancelAltEdit}>
+                キャンセル
+              </Button>
+              <Button variant="accent" size="sm" onClick={saveAltEdit}>
+                保存
+              </Button>
+            </div>
           </div>
         </div>
       )}

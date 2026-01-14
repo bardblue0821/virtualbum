@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuthUser } from '@/src/hooks/useAuthUser';
 import { getUserByHandle, updateUser } from '../../../lib/repos/userRepo';
 import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
@@ -16,6 +16,7 @@ import { auth } from '../../../lib/firebase';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider, reauthenticateWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import Avatar from '../../../components/profile/Avatar';
 import AvatarModal from '../../../components/profile/AvatarModal';
+import ProfileEditModal from '../../../components/profile/ProfileEditModal';
 import InlineTextField from '../../../components/form/InlineTextField';
 import InlineTextareaField from '../../../components/form/InlineTextareaField';
 import LinksField from '../../../components/form/LinksField';
@@ -29,7 +30,8 @@ import { TimelineItem } from '../../../components/timeline/TimelineItem';
 import GalleryGrid, { type PhotoItem } from '../../../components/gallery/GalleryGrid';
 import { listImages, listImagesByUploaderPage, countImagesByUploader } from '../../../lib/repos/imageRepo';
 import { listComments } from '../../../lib/repos/commentRepo';
-import { countLikes, hasLiked, toggleLike } from '../../../lib/repos/likeRepo';
+import { countLikes, hasLiked, toggleLike, listLikedAlbumIdsByUser } from '../../../lib/repos/likeRepo';
+import { countReposts, hasReposted, toggleRepost } from '../../../lib/repos/repostRepo';
 import { listReactionsByAlbum, toggleReaction } from '../../../lib/repos/reactionRepo';
 import { addNotification } from '../../../lib/repos/notificationRepo';
 import { getUser } from '../../../lib/repos/userRepo';
@@ -39,8 +41,14 @@ import DeleteConfirmModal from '../../../components/album/DeleteConfirmModal';
 import ReportConfirmModal from '../../../components/album/ReportConfirmModal';
 import { deleteAlbum } from '../../../lib/repos/albumRepo';
 
+import EditPencilIcon from '../../../components/icons/EditPencilIcon';
+import ShareButton from '../../../components/icons/ShareButton';
+import TagInput from '../../../components/form/TagInput';
+import { getUserTags, updateUserTags, getAllUserTags, filterTagCandidates } from '../../../lib/repos/tagRepo';
+
 export default function ProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const handleParam = params?.id as string | undefined;
   const { user } = useAuthUser();
 
@@ -79,9 +87,16 @@ export default function ProfilePage() {
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState<string | null>(null);
   // Tab state for lists
-  const [listTab, setListTab] = useState<'own'|'joined'|'comments'|'images'>('own');
+  const [listTab, setListTab] = useState<'own'|'joined'|'comments'|'images'|'likes'>('own');
   const [ownRows, setOwnRows] = useState<any[]>([]);
   const [joinedRows, setJoinedRows] = useState<any[]>([]);
+
+  // Likes tab (自分のみ閲覧可)
+  const [likedRows, setLikedRows] = useState<any[]>([]);
+  const [likedLoading, setLikedLoading] = useState(false);
+  const [likedError, setLikedError] = useState<string | null>(null);
+  const [likedCount, setLikedCount] = useState<number>(0);
+  const likedLoadedRef = useRef(false);
 
   // Uploaded images tab
   const [uploadedPhotos, setUploadedPhotos] = useState<PhotoItem[] | null>(null);
@@ -94,6 +109,15 @@ export default function ProfilePage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const albumMetaRef = useRef(new Map<string, { title: string; ownerIconURL: string | null }>());
   const ownerIconCacheRef = useRef(new Map<string, string | null>());
+
+  // ユーザータグ
+  const [userTags, setUserTags] = useState<string[]>([]);
+  const [tagCandidates, setTagCandidates] = useState<string[]>([]);
+  const [editingTags, setEditingTags] = useState(false);
+  const [savingTags, setSavingTags] = useState(false);
+  
+  // プロフィール編集モーダル
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
 
   // Inline edit state
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -199,6 +223,27 @@ export default function ProfilePage() {
     return () => { active = false; };
   }, [handleParam, user]);
 
+  // Load user tags
+  useEffect(() => {
+    if (!profile?.uid) return;
+    let active = true;
+    (async () => {
+      try {
+        const [tags, candidates] = await Promise.all([
+          getUserTags(profile.uid),
+          getAllUserTags(100),
+        ]);
+        if (active) {
+          setUserTags(tags);
+          setTagCandidates(candidates);
+        }
+      } catch (e) {
+        console.warn('Failed to load user tags:', e);
+      }
+    })();
+    return () => { active = false; };
+  }, [profile?.uid]);
+
   // Load extra info
   useEffect(() => {
     if (!profile?.uid) return;
@@ -214,6 +259,23 @@ export default function ProfilePage() {
         ]);
         const filteredIds = joinedIds.filter(id => !own.some(a => a.id === id));
         const joined = await Promise.all(filteredIds.map(id => getAlbum(id)));
+        
+        // コメントにアルバム情報を付与
+        const commentsWithAlbumInfo = await Promise.all(
+          comments.map(async (c) => {
+            try {
+              const album = await getAlbum(c.albumId);
+              return {
+                ...c,
+                albumTitle: album?.title || '（タイトルなし）',
+                albumThumb: album?.coverImageURL || null,
+              };
+            } catch {
+              return { ...c, albumTitle: '（不明なアルバム）', albumThumb: null };
+            }
+          })
+        );
+        
         // watchers/friends counts
         let watcherIds: string[] = [];
         let friendOtherIds: string[] = [];
@@ -227,7 +289,7 @@ export default function ProfilePage() {
         if (active) {
           setOwnAlbums(own);
           setJoinedAlbums(joined.filter(a => !!a));
-          setUserComments(comments);
+          setUserComments(commentsWithAlbumInfo);
           setStats({ ownCount: own.length, joinedCount: filteredIds.length, commentCount: comments.length, imageCount });
           setWatchersCount(watcherIds.length);
           setFriendsCount(friendOtherIds.length);
@@ -477,6 +539,96 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listTab, uploadedHasMore, uploadedLoading, profile?.uid]);
 
+  // Load liked albums count (自分のみ、タブ選択前に件数だけ取得)
+  useEffect(() => {
+    if (!profile?.uid || !user?.uid) return;
+    if (profile.uid !== user.uid) return; // 自分のプロフィールでのみ
+    
+    let cancelled = false;
+    (async () => {
+      try {
+        const albumIds = await listLikedAlbumIdsByUser(user.uid, 100);
+        if (!cancelled) setLikedCount(albumIds.length);
+      } catch (e) {
+        // エラーは無視
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.uid, user?.uid]);
+
+  // Load liked albums when likes tab is opened (自分のみ)
+  useEffect(() => {
+    if (!profile?.uid || !user?.uid) return;
+    if (profile.uid !== user.uid) return; // 自分のプロフィールでのみ
+    if (listTab !== 'likes') return;
+    if (likedLoadedRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      setLikedLoading(true);
+      setLikedError(null);
+      try {
+        const albumIds = await listLikedAlbumIdsByUser(user.uid, 100);
+        const albums = (await Promise.all(albumIds.map(id => getAlbum(id).catch(() => null)))).filter(Boolean);
+        
+        const cache = new Map<string, any>();
+        const rows = await Promise.all(albums.map(async (album: any) => {
+          const [imgs, cmts, likeCnt, likedFlag, repostCnt, repostedFlag, reactions, ownerUser] = await Promise.all([
+            listImages(album.id),
+            listComments(album.id),
+            countLikes(album.id),
+            hasLiked(album.id, user.uid),
+            countReposts(album.id),
+            hasReposted(album.id, user.uid),
+            listReactionsByAlbum(album.id, user.uid),
+            getUser(album.ownerId).catch(() => null),
+          ]);
+          const cAsc = [...cmts]
+            .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
+          const latest = cAsc.slice(-1)[0];
+          const previewDesc = cAsc.slice(-3).reverse();
+          const commentsPreview = await Promise.all(previewDesc.map(async (c) => {
+            let cu = cache.get(c.userId);
+            if (cu === undefined) {
+              const u = await getUser(c.userId).catch(() => null);
+              cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+              cache.set(c.userId, cu);
+            }
+            return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
+          }));
+          const imgRows = (imgs || [])
+            .map((x: any) => ({ url: x.url || x.downloadUrl || "", thumbUrl: x.thumbUrl || x.url || x.downloadUrl || "", uploaderId: x.uploaderId }))
+            .filter((x: any) => x.url);
+          const ownerRef = ownerUser ? { uid: ownerUser.uid, handle: ownerUser.handle || null, iconURL: ownerUser.iconURL || null, displayName: ownerUser.displayName } : undefined;
+          return {
+            album,
+            images: imgRows,
+            likeCount: likeCnt,
+            liked: !!likedFlag,
+            repostCount: repostCnt,
+            reposted: !!repostedFlag,
+            commentCount: (cmts || []).length,
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview,
+            reactions,
+            owner: ownerRef,
+          };
+        }));
+
+        if (!cancelled) {
+          setLikedRows(rows);
+          setLikedCount(rows.length);
+          likedLoadedRef.current = true;
+        }
+      } catch (e: any) {
+        if (!cancelled) setLikedError(translateError(e));
+      } finally {
+        if (!cancelled) setLikedLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.uid, user?.uid, listTab]);
+
   // Build timeline-like rows for own albums
   useEffect(() => {
     let cancelled = false;
@@ -486,11 +638,13 @@ export default function ProfilePage() {
         const cache = new Map<string, any>();
         const ownerRef = { uid: profile.uid, handle: profile.handle || null, iconURL: profile.iconURL || null, displayName: profile.displayName };
         const rows = await Promise.all(ownAlbums.map(async (album) => {
-          const [imgs, cmts, likeCnt, likedFlag, reactions] = await Promise.all([
+          const [imgs, cmts, likeCnt, likedFlag, repostCnt, repostedFlag, reactions] = await Promise.all([
             listImages(album.id),
             listComments(album.id),
             countLikes(album.id),
             user?.uid ? hasLiked(album.id, user.uid) : Promise.resolve(false),
+            countReposts(album.id),
+            user?.uid ? hasReposted(album.id, user.uid) : Promise.resolve(false),
             listReactionsByAlbum(album.id, user?.uid || ''),
           ]);
           const cAsc = [...cmts]
@@ -514,6 +668,8 @@ export default function ProfilePage() {
             images: imgRows,
             likeCount: likeCnt,
             liked: !!likedFlag,
+            repostCount: repostCnt,
+            reposted: !!repostedFlag,
             commentCount: (cmts || []).length,
             latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
             commentsPreview,
@@ -538,11 +694,13 @@ export default function ProfilePage() {
         if (!joinedAlbums) { if (!cancelled) setJoinedRows([]); return; }
         const cache = new Map<string, any>();
         const rows = await Promise.all(joinedAlbums.map(async (album) => {
-          const [imgs, cmts, likeCnt, likedFlag, reactions, ownerUser] = await Promise.all([
+          const [imgs, cmts, likeCnt, likedFlag, repostCnt, repostedFlag, reactions, ownerUser] = await Promise.all([
             listImages(album.id),
             listComments(album.id),
             countLikes(album.id),
             user?.uid ? hasLiked(album.id, user.uid) : Promise.resolve(false),
+            countReposts(album.id),
+            user?.uid ? hasReposted(album.id, user.uid) : Promise.resolve(false),
             listReactionsByAlbum(album.id, user?.uid || ''),
             getUser(album.ownerId).catch(()=>null),
           ]);
@@ -568,6 +726,8 @@ export default function ProfilePage() {
             images: imgRows,
             likeCount: likeCnt,
             liked: !!likedFlag,
+            repostCount: repostCnt,
+            reposted: !!repostedFlag,
             commentCount: (cmts || []).length,
             latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
             commentsPreview,
@@ -811,6 +971,257 @@ export default function ProfilePage() {
     } catch {
       await addComment(albumId, user.uid, text);
     }
+  }
+
+  // Like toggle for liked rows (optimistic)
+  async function handleToggleLikeLiked(index: number) {
+    if (!user) return;
+    const albumId = likedRows[index]?.album?.id;
+    if (!albumId) return;
+    setLikedRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const likedPrev = row.liked;
+      row.liked = !likedPrev;
+      row.likeCount = likedPrev ? row.likeCount - 1 : row.likeCount + 1;
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/likes/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleLike(albumId, user.uid);
+      }
+    } catch {
+      setLikedRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.liked = !row.liked;
+        row.likeCount = row.liked ? row.likeCount + 1 : row.likeCount - 1;
+        return next;
+      });
+    }
+  }
+
+  // Reaction toggle for liked rows (optimistic + notification)
+  async function handleToggleReactionLiked(index: number, emoji: string) {
+    if (!user) return;
+    const albumId = likedRows[index]?.album?.id;
+    if (!albumId) return;
+    setLikedRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const list = row.reactions.slice();
+      const idx = list.findIndex((x: any) => x.emoji === emoji);
+      if (idx >= 0) {
+        const item = { ...list[idx] };
+        if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+        else { item.mine = true; item.count += 1; }
+        list[idx] = item;
+      } else {
+        list.push({ emoji, count: 1, mine: true });
+      }
+      row.reactions = list;
+      next[index] = { ...row };
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reactions/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, emoji }),
+      });
+      let added = false;
+      if (res.ok) {
+        const data = await res.json().catch(()=>({}));
+        added = !!data?.added;
+      } else {
+        const result = await toggleReaction(albumId, user.uid, emoji);
+        added = !!(result as any)?.added;
+      }
+      const row = likedRows[index];
+      if (added && row && row.album.ownerId !== user.uid) {
+        addNotification({ userId: row.album.ownerId, actorId: user.uid, type: 'reaction', albumId, message: 'アルバムにリアクション: ' + emoji }).catch(()=>{});
+      }
+    } catch {
+      setLikedRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        const list = row.reactions.slice();
+        const idx = list.findIndex((x: any) => x.emoji === emoji);
+        if (idx >= 0) {
+          const item = { ...list[idx] };
+          if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+          else { item.mine = true; item.count += 1; }
+          list[idx] = item;
+        }
+        row.reactions = list;
+        next[index] = { ...row };
+        return next;
+      });
+    }
+  }
+
+  async function handleSubmitCommentLiked(index: number, text: string) {
+    if (!user) return;
+    const albumId = likedRows[index]?.album?.id;
+    if (!albumId) return;
+    const { addComment } = await import('../../../lib/repos/commentRepo');
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/comments/add', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, body: text }),
+      });
+      if (!res.ok) { await addComment(albumId, user.uid, text); }
+    } catch {
+      await addComment(albumId, user.uid, text);
+    }
+  }
+
+  // Repost toggle for liked rows (optimistic)
+  async function handleToggleRepostLiked(index: number) {
+    if (!user) return;
+    const albumId = likedRows[index]?.album?.id;
+    if (!albumId) return;
+    setLikedRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const repostedPrev = row.reposted;
+      row.reposted = !repostedPrev;
+      row.repostCount = repostedPrev ? row.repostCount - 1 : row.repostCount + 1;
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reposts/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleRepost(albumId, user.uid);
+      }
+    } catch {
+      setLikedRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.reposted = !row.reposted;
+        row.repostCount = row.reposted ? row.repostCount + 1 : row.repostCount - 1;
+        return next;
+      });
+    }
+  }
+
+  // Repost toggle for own rows (optimistic)
+  async function handleToggleRepostOwn(index: number) {
+    if (!user) return;
+    const albumId = ownRows[index]?.album?.id;
+    if (!albumId) return;
+    setOwnRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const repostedPrev = row.reposted;
+      row.reposted = !repostedPrev;
+      row.repostCount = repostedPrev ? row.repostCount - 1 : row.repostCount + 1;
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reposts/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleRepost(albumId, user.uid);
+      }
+    } catch {
+      setOwnRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.reposted = !row.reposted;
+        row.repostCount = row.reposted ? row.repostCount + 1 : row.repostCount - 1;
+        return next;
+      });
+    }
+  }
+
+  // Repost toggle for joined rows (optimistic)
+  async function handleToggleRepostJoined(index: number) {
+    if (!user) return;
+    const albumId = joinedRows[index]?.album?.id;
+    if (!albumId) return;
+    setJoinedRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const repostedPrev = row.reposted;
+      row.reposted = !repostedPrev;
+      row.repostCount = repostedPrev ? row.repostCount - 1 : row.repostCount + 1;
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reposts/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleRepost(albumId, user.uid);
+      }
+    } catch {
+      setJoinedRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.reposted = !row.reposted;
+        row.repostCount = row.reposted ? row.repostCount + 1 : row.repostCount - 1;
+        return next;
+      });
+    }
+  }
+
+
+  // タグ保存
+  async function handleSaveTags(newTags: string[]) {
+    if (!user || !profile?.uid || profile.uid !== user.uid) return;
+    setSavingTags(true);
+    try {
+      await updateUserTags(profile.uid, newTags);
+      setUserTags(newTags);
+      setEditingTags(false);
+      show({ message: 'タグを保存しました', variant: 'success' });
+    } catch (e: any) {
+      show({ message: e.message || 'タグの保存に失敗しました', variant: 'error' });
+    } finally {
+      setSavingTags(false);
+    }
+  }
+
+  // プロフィール編集保存
+  async function handleSaveProfile(newBio: string, newUrl: string, newTags: string[]) {
+    if (!user || !profile?.uid || profile.uid !== user.uid) return;
+    
+    const patch: any = {};
+    if (newBio !== (profile.bio || '')) patch.bio = newBio;
+    if (newUrl !== (profile.vrchatUrl || '')) patch.vrchatUrl = newUrl;
+    
+    await updateUser(profile.uid, patch);
+    await updateUserTags(profile.uid, newTags);
+    
+    setProfile({ ...profile, ...patch });
+    setUserTags(newTags);
+    show({ message: 'プロフィールを保存しました', variant: 'success' });
   }
 
   // Friend actions
@@ -1077,14 +1488,54 @@ export default function ProfilePage() {
   function saveFromModal() { void commitEdit(); }
   function discardChanges() { cancelEdit(); }
 
+  // 自己紹介テキスト内のURLをリンク化する関数
+  function renderBioWithLinks(text: string) {
+    // URLを検出する正規表現
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[--accent] hover:underline break-all"
+          >
+            {part}
+          </a>
+        );
+      }
+      return <React.Fragment key={index}>{part}</React.Fragment>;
+    });
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
-      <header className="space-y-3">
+      <header className="space-y-3 relative">
+        {/* 右上の編集ボタンと共有ボタン */}
+        <div className="absolute top-0 right-0 flex items-center gap-1">
+          {isMe && (
+            <EditPencilIcon
+              onClick={() => setProfileEditOpen(true)}
+              title="プロフィールを編集"
+              size={18}
+            />
+          )}
+          <ShareButton
+            url={typeof window !== 'undefined' ? window.location.href : ''}
+            title={`${profile.displayName || 'ユーザー'}のプロフィール`}
+            size={18}
+          />
+        </div>
         <div className="flex items-center gap-4">
           <Avatar
             src={profile.iconURL ? `${profile.iconURL}${profile.iconUpdatedAt ? `?v=${new Date((profile.iconUpdatedAt as any)?.seconds ? (profile.iconUpdatedAt as any).toDate?.() : profile.iconUpdatedAt).getTime()}` : ''}` : undefined}
             size={72}
             onClick={()=> setAvatarOpen(true)}
+            withBorder={false}
           />
           <div className="min-w-0">
             <div className="flex flex-col">
@@ -1152,52 +1603,54 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        <InlineTextareaField
-          label="自己紹介"
-          value={profile.bio || ''}
-          placeholder="未設定"
-          field="bio"
-          editingField={editingField}
-          editingValue={editingValue}
-          beginEdit={beginEdit}
-          onChange={setEditingValue}
-          onBlur={handleBlur}
-          isMe={isMe}
-          saving={saving}
-          onSave={commitEdit}
-          setSkipDiscard={setSkipDiscardNextBlur}
-        />
-        {!detailsOpen && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => setDetailsOpen(true)}
-            className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent"
-          >
-            詳細を表示
-          </Button>
-        )}
-        {detailsOpen && (
-          <div className="space-y-2">
-            <InlineTextField label="VRChat URL" value={profile.vrchatUrl || ''} placeholder="未設定" field="vrchatUrl" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} isLink onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <LinksField profile={profile} editingField={editingField} editingValue={editingValue} editingLinkIndex={editingLinkIndex} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <InlineTextField label="言語" value={profile.language || ''} placeholder="未設定" field="language" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <InlineTextField label="性別" value={profile.gender || ''} placeholder="未設定" field="gender" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <InlineTextField label="年齢" value={typeof profile.age === 'number' ? String(profile.age) : ''} placeholder="未設定" field="age" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} numeric onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <InlineTextField label="場所" value={profile.location || ''} placeholder="未設定" field="location" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <InlineTextField label="生年月日" value={profile.birthDate || ''} placeholder="未設定" field="birthDate" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} date onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => setDetailsOpen(false)}
-              className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent"
-            >
-              詳細を隠す
-            </Button>
+        
+        {/* 自己紹介文 */}
+        <div className="space-y-1">
+          {profile.bio ? (
+            <p className="text-sm whitespace-pre-line">{renderBioWithLinks(profile.bio)}</p>
+          ) : (
+            isMe && <p className="text-sm text-muted">自己紹介未設定</p>
+          )}
+        </div>
+        
+        {/* URL */}
+        {(profile.vrchatUrl || isMe) && (
+          <div className="space-y-1">
+            {profile.vrchatUrl ? (
+              <a
+                href={profile.vrchatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[--accent] hover:underline break-all"
+              >
+                {profile.vrchatUrl}
+              </a>
+            ) : (
+              isMe && <p className="text-sm text-muted">URL未設定</p>
+            )}
           </div>
         )}
+
+        {/* ユーザータグ */}
+        <div className="space-y-1">
+          <div className="flex flex-wrap gap-1">
+            {userTags.length > 0 ? (
+              userTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => router.push(`/search?q=${encodeURIComponent(tag)}`)}
+                  className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer"
+                >
+                  #{tag}
+                </button>
+              ))
+            ) : (
+              isMe && <span className="text-xs text-muted">タグなし</span>
+            )}
+          </div>
+        </div>
+
         {/*saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>*/}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
@@ -1214,6 +1667,17 @@ export default function ProfilePage() {
         alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'}
         editable={!!isMe}
         onUpdated={(thumbUrl, fullUrl)=> setProfile((p:any)=> ({ ...p, iconURL: thumbUrl, iconFullURL: fullUrl, iconUpdatedAt: new Date() }))}
+      />
+
+      {/* プロフィール編集モーダル */}
+      <ProfileEditModal
+        open={profileEditOpen}
+        onClose={() => setProfileEditOpen(false)}
+        bio={profile.bio || ''}
+        url={profile.vrchatUrl || ''}
+        tags={userTags}
+        tagCandidates={tagCandidates}
+        onSave={handleSaveProfile}
       />
 
       {isMe && (
@@ -1293,6 +1757,16 @@ export default function ProfilePage() {
               className={`${listTab==='images' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
               onClick={()=> setListTab('images')}
             >投稿画像 <span className="text-xs text-muted ml-1">({uploadedPhotos ? uploadedPhotos.length : (stats?.imageCount ?? '-')})</span></button>
+            {/* いいねタブ（自分のみ閲覧可） */}
+            {isMe && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={listTab==='likes'}
+                className={`${listTab==='likes' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
+                onClick={()=> setListTab('likes')}
+              >いいね <span className="text-xs text-muted ml-1">({likedCount})</span></button>
+            )}
           </div>
 
           {/* Panels */}
@@ -1310,6 +1784,9 @@ export default function ProfilePage() {
                       likeCount={row.likeCount}
                       liked={row.liked}
                       onLike={user ? () => handleToggleLikeOwn(i) : () => {}}
+                      repostCount={row.repostCount}
+                      reposted={row.reposted}
+                      onToggleRepost={user ? () => handleToggleRepostOwn(i) : undefined}
                       currentUserId={user?.uid || undefined}
                       onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
                       onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
@@ -1343,6 +1820,9 @@ export default function ProfilePage() {
                       likeCount={row.likeCount}
                       liked={row.liked}
                       onLike={user ? () => handleToggleLikeJoined(i) : () => {}}
+                      repostCount={row.repostCount}
+                      reposted={row.reposted}
+                      onToggleRepost={user ? () => handleToggleRepostJoined(i) : undefined}
                       currentUserId={user?.uid || undefined}
                       onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
                       onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
@@ -1368,10 +1848,19 @@ export default function ProfilePage() {
               {userComments && userComments.length === 0 && <p className="text-sm text-muted/80">コメントはまだありません</p>}
               <ul className="divide-y divide-line">
                 {userComments && userComments.map(c => (
-                  <li key={c.id} className="py-2 text-sm">
-                    <p className="whitespace-pre-line">{c.body}</p>
-                    <a href={`/album/${c.albumId}`} className="text-xs link-accent">アルバムへ</a>
-                    <p className="text-[10px] text-muted/80">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                  <li key={c.id} className="py-3">
+                    <a href={`/album/${c.albumId}`} className="block hover:bg-surface-weak rounded-md p-2 -m-2 transition-colors">
+                      <div className="space-y-1">
+                        {/* アルバムタイトル */}
+                        <p className="text-xs font-medium text-foreground/80 truncate">
+                          {c.albumTitle}
+                        </p>
+                        {/* コメント本文 */}
+                        <p className="text-sm whitespace-pre-line line-clamp-2">{c.body}</p>
+                        {/* 日時 */}
+                        <p className="text-[10px] text-muted/60">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                      </div>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -1409,6 +1898,44 @@ export default function ProfilePage() {
                 />
               )}
               <div ref={sentinelRef} className="h-10" />
+            </div>
+          )}
+
+          {/* いいねタブ（自分のみ閲覧可） */}
+          {isMe && listTab==='likes' && (
+            <div role="tabpanel" aria-label="いいね">
+              {likedLoading && <p className="text-sm text-muted/80">読み込み中...</p>}
+              {likedError && <p className="text-sm text-red-600">{likedError}</p>}
+              {!likedLoading && likedRows.length === 0 && <p className="text-sm text-muted/80">いいねしたアルバムはまだありません</p>}
+              {likedRows.length > 0 && (
+                <div className="divide-y divide-line *:pb-12">
+                  {likedRows.map((row, i) => (
+                    <TimelineItem
+                      key={row.album.id}
+                      album={row.album}
+                      images={row.images}
+                      likeCount={row.likeCount}
+                      liked={row.liked}
+                      onLike={() => handleToggleLikeLiked(i)}
+                      repostCount={row.repostCount}
+                      reposted={row.reposted}
+                      onToggleRepost={() => handleToggleRepostLiked(i)}
+                      currentUserId={user?.uid || undefined}
+                      onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
+                      onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
+                      commentCount={row.commentCount}
+                      latestComment={row.latestComment}
+                      commentsPreview={row.commentsPreview}
+                      onCommentSubmit={(text) => handleSubmitCommentLiked(i, text)}
+                      reactions={row.reactions}
+                      onToggleReaction={(emoji) => handleToggleReactionLiked(i, emoji)}
+                      owner={row.owner}
+                      isFriend={false}
+                      isWatched={false}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

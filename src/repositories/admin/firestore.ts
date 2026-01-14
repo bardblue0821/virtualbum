@@ -5,12 +5,13 @@ import { createLogger } from '@/lib/logger';
 
 const log = createLogger('admin:firestore');
 
-export async function adminAddImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string) {
+export async function adminAddImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string, alt?: string) {
   try {
     const db = getAdminDb();
     const data: Record<string, unknown> = { albumId, uploaderId, url, createdAt: admin.firestore.FieldValue.serverTimestamp() };
     if (thumbUrl) data.thumbUrl = thumbUrl;
-    log.debug('adding image:', { albumId, uploaderId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
+    if (alt) data.alt = alt;
+    log.debug('adding image:', { albumId, uploaderId, hasUrl: !!url, hasThumbUrl: !!thumbUrl, hasAlt: !!alt });
     const ref = await db.collection(COL.albumImages).add(data);
     log.debug('image added, id:', ref.id);
     await ref.update({ id: ref.id });

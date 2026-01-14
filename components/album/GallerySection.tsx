@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { type PhotoItem } from "../gallery/GalleryGrid";
 
@@ -161,6 +161,17 @@ export default function GallerySection(props: GallerySectionProps) {
                 </span>
               )}
             </div>
+            {/* ALTボタン（右下） */}
+            {photo.alt && (
+              <div className="absolute right-1 bottom-1 group/alt">
+                <span className="inline-block bg-black/70 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded cursor-help">
+                  ALT
+                </span>
+                <div className="absolute right-0 bottom-full mb-1 hidden group-hover/alt:block w-max max-w-[200px] bg-black/90 text-white text-xs p-2 rounded shadow-lg z-10">
+                  {photo.alt}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

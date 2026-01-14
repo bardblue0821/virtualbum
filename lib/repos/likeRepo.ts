@@ -1,5 +1,5 @@
 import { db } from '../firebase'
-import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, limit } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore'
 import { COL } from '../paths'
 import { getUser } from './userRepo'
 import type { Reactor } from './reactionRepo'
@@ -95,4 +95,22 @@ export async function listLikersByAlbum(albumId: string, limitCount = 20): Promi
     .map(uid => byId.get(uid))
     .filter((u): u is NonNullable<typeof u> => !!u)
     .map((u) => ({ uid: u.uid, displayName: u.displayName, handle: (u as any).handle ?? null, iconURL: (u as any).iconURL }))
+}
+
+// ユーザーがいいねしたアルバムIDを取得
+export async function listLikedAlbumIdsByUser(userId: string, limitCount = 100): Promise<string[]> {
+  const q = query(
+    collection(db, COL.likes),
+    where('userId', '==', userId),
+    limit(limitCount)
+  )
+  const snap = await getDocs(q)
+  const albumIds: string[] = []
+  snap.forEach((d) => {
+    const data = d.data()
+    if (data.albumId) {
+      albumIds.push(data.albumId)
+    }
+  })
+  return albumIds
 }

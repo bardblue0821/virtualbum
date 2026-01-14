@@ -5,9 +5,9 @@
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
-import PrivacyPolicyPage from '../../app/privacy-policy/page';
+import PrivacyPolicyPage from '../../app/legal/privacy-policy/page';
 
-describe('/privacy-policy プライバシーポリシーページ', () => {
+describe('/legal/privacy-policy プライバシーポリシーページ', () => {
   test('ページタイトル・バージョン・日付が表示される', () => {
     render(<PrivacyPolicyPage />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('プライバシーポリシー');

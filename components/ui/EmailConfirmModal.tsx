@@ -7,6 +7,7 @@ export interface EmailConfirmModalProps {
   open: boolean;
   email: string;
   onClose: () => void;
+  onConfirm?: () => void;
 }
 
 /**
@@ -17,8 +18,17 @@ export default function EmailConfirmModal({
   open,
   email,
   onClose,
+  onConfirm,
 }: EmailConfirmModalProps) {
   if (!open) return null;
+
+  const handleConfirm = () => {
+    if (onConfirm) {
+      onConfirm();
+    } else {
+      onClose();
+    }
+  };
 
   return (
     <div
@@ -27,7 +37,7 @@ export default function EmailConfirmModal({
       data-testid="email-confirm-modal-overlay"
     >
       <div
-        className="surface-alt border border-base rounded-lg shadow-xl w-[min(90vw,400px)] p-5"
+        className="bg-white dark:bg-gray-800 border border-base rounded-lg shadow-xl w-[min(90vw,400px)] p-5"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -63,7 +73,7 @@ export default function EmailConfirmModal({
             type="button"
             variant="accent"
             size="sm"
-            onClick={onClose}
+            onClick={handleConfirm}
           >
             確認
           </Button>

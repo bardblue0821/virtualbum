@@ -201,17 +201,24 @@ function SideNavInner() {
             <MenuButton onClick={toggleTheme}>
               {currentTheme === 'dark' ? '☀️ ライトモード' : '🌙 ダークモード'}
             </MenuButton>
-            <Link href="/termsofservice" className="block w-full">
+            {user && (
+              <Link href="/settings/password" className="block w-full">
+                <MenuButton onClick={() => setMenuOpen(false)}>
+                  🔑 パスワードの変更
+                </MenuButton>
+              </Link>
+            )}
+            <Link href="/legal/termsofservice" className="block w-full">
               <MenuButton onClick={() => setMenuOpen(false)}>
                 利用規約
               </MenuButton>
             </Link>
-            <Link href="/privacy-policy" className="block w-full">
+            <Link href="/legal/privacy-policy" className="block w-full">
               <MenuButton onClick={() => setMenuOpen(false)}>
                 プライバシーポリシー
               </MenuButton>
             </Link>
-            <Link href="/faq" className="block w-full">
+            <Link href="/legal/faq" className="block w-full">
               <MenuButton onClick={() => setMenuOpen(false)}>
                 FAQ
               </MenuButton>

@@ -100,7 +100,7 @@ export default function MobileTopNav() {
   }, [menuOpen]);
 
   // 公開ページでは非表示
-  const publicPaths = new Set<string>(['/', '/login', '/register', '/forgot-password', '/reset-password']);
+  const publicPaths = new Set<string>(['/', '/login', '/register', '/settings/forgot-password', '/settings/reset-password']);
   const isPublicPage = publicPaths.has(pathname) || pathname.startsWith('/register/');
 
   if (!mounted || !user || isPublicPage) return null;
@@ -170,19 +170,33 @@ export default function MobileTopNav() {
             {menuOpen && (
               <div ref={menuRef} className="absolute bottom-16 right-0 z-50 bg-background border border-line rounded-md shadow-md min-w-40 p-2">
                 {user && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    fullWidth
-                    className="border-0 bg-transparent hover:bg-transparent justify-start text-red-600"
-                    onClick={() => {
-                      signOut(auth).catch(() => {});
-                      setMenuOpen(false);
-                    }}
-                  >
-                    ログアウト
-                  </Button>
+                  <>
+                    <Link href="/settings/password" className="block w-full">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        fullWidth
+                        className="border-0 bg-transparent hover:bg-transparent justify-start"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        🔑 パスワードの変更
+                      </Button>
+                    </Link>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      fullWidth
+                      className="border-0 bg-transparent hover:bg-transparent justify-start text-red-600"
+                      onClick={() => {
+                        signOut(auth).catch(() => {});
+                        setMenuOpen(false);
+                      }}
+                    >
+                      ログアウト
+                    </Button>
+                  </>
                 )}
               </div>
             )}

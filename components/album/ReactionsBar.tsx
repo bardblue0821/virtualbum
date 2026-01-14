@@ -49,6 +49,7 @@ export default function ReactionsBar(props: ReactionsBarProps) {
           disabled={likeBusy}
           onClick={onToggleLike}
           className={`${liked ? "text-pink-600" : "fg-muted"} disabled:opacity-50`}
+          title={liked ? "いいねを取り消す" : "いいねする"}
         >
           <HeartIcon filled={liked} size={20} />
         </button>
@@ -67,6 +68,7 @@ export default function ReactionsBar(props: ReactionsBarProps) {
                 onClick={() => onPickEmoji(r.emoji)}
                 className="rounded border px-2 py-1 text-sm bg-page"
                 style={mine ? { borderColor: "var(--accent)", color: "var(--accent)" } : { borderColor: "var(--border)" }}
+                title={mine ? `${r.emoji} を取り消す` : `${r.emoji} でリアクション`}
               >{r.emoji} <span className="text-xs">{count}</span></button>
               {hoveredEmoji === r.emoji && (
                 <ReactorPopover emoji={r.emoji} users={reactorMap[r.emoji]} loading={reactorLoading[r.emoji]} />
@@ -79,6 +81,7 @@ export default function ReactionsBar(props: ReactionsBarProps) {
           aria-label="リアクションを追加"
           onClick={onTogglePicker}
           className="px-1 text-lg leading-none fg-muted"
+          title="リアクションを追加"
         >＋</button>
         <ReactionPicker
           open={pickerOpen}
