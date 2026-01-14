@@ -131,3 +131,265 @@ React.memo: 適切な箇所でメモ化
  ビジネスロジックは_lib/に分離
  再利用可能な部品は_shared/に配置
  型定義が明確
+
+---
+
+## 追加: Virtualbum プロジェクト固有の指針
+
+### 11. Firebase統合パターン
+
+11.1 Firestoreクエリの分離
+- _lib/queries.ts にFirestoreクエリ関数を集約
+- キャッシュ戦略（revalidatePath/revalidateTag）を明示
+- 権限チェックは Backend SDK（firebase-admin）で実施
+
+例：
+```typescript
+// _lib/queries.ts
+import { initializeServerSDK } from '@/lib/firebase-admin';
+
+export async function fetchAlbum(id: string) {
+  const db = initializeServerSDK();
+  const doc = await db.collection('albums').doc(id).get();
+  if (!doc.exists) return null;
+  return doc.data();
+}
+
+// app/album/[id]/page.tsx
+export default async function Page({ params }: Props) {
+  const album = await fetchAlbum(params.id);
+  return <MainContent album={album} />;
+}
+```
+
+11.2 クライアント側の状態管理
+- react-firebase-hooks の useDocument/useCollection を活用
+- リアルタイム更新が必要な部分のみClient Component化
+- useAuthUser で認証ユーザー情報を取得
+
+例：
+```typescript
+// "use client"
+import { useDocument } from 'react-firebase-hooks/firestore';
+import { doc } from 'firebase/firestore';
+
+export function AlbumDetail({ id }: Props) {
+  const [value, loading, error] = useDocument(doc(db, 'albums', id));
+  if (loading) return <Skeleton />;
+  if (error) return <Error />;
+  return <Content album={value?.data()} />;
+}
+```
+
+11.3 認証状態の外部化
+- useAuthUser フックをカスタムフック化（既存）
+- page.tsx でのonAuthStateChanged不要（useAuthUserで管理）
+- 認証が必要なページは AuthGate でラップ
+
+### 12. パフォーマンス最適化（Virtualbum特有）
+
+12.1 画像処理の遅延ロード
+- next/image の priority 属性を活用
+- 初期表示はサムネイル、クリック時に原寸サイズ
+- 無限スクロール時は Intersection Observer との組み合わせ
+
+例：
+```typescript
+import Image from 'next/image';
+
+export function AlbumCard({ album }: Props) {
+  const [isVisible, ref] = useInView({ threshold: 0.1 });
+  
+  return (
+    <div ref={ref}>
+      {isVisible && (
+        <Image
+          src={album.firstImageUrl}
+          alt={album.title}
+          width={300}
+          height={300}
+          placeholder="blur"
+          blurDataURL={album.thumbDataUrl}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+12.2 無限スクロール実装の最適化
+- react-intersection-observer と useInfiniteQuery のペア
+- 既読済みアイテムのメモ化
+- 同じデータの重複フェッチ防止
+
+例：
+```typescript
+// _lib/hooks.ts
+export function useAlbumList() {
+  const [items, setItems] = useState([]);
+  const [lastDoc, setLastDoc] = useState(null);
+  
+  const loadMore = async () => {
+    const newDocs = await fetchAlbums(lastDoc);
+    setItems(prev => [...prev, ...newDocs]);
+    setLastDoc(newDocs[newDocs.length - 1]);
+  };
+  
+  return { items, loadMore };
+}
+```
+
+12.3 リアルタイム更新の最適化
+- コメント・リアクション追加時は局所的に状態更新
+- タイムライン全体の再フェッチは不要
+- useCollection の limit() で初期データ制限
+
+### 13. エラーハンドリングの統一
+
+13.1 Firebase固有エラー
+- auth/ エラーは mapAuthError で統一メッセージ化（既存）
+- permission-denied は403ページへリダイレクト
+- not-found は404ページへリダイレクト
+
+13.2 API エラーハンドリング
+- _lib/errors.ts に統一エラークラス定義
+- Server Actions で catch して適切なレスポンスを返す
+
+例：
+```typescript
+// _lib/errors.ts
+export class FirestoreError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+  }
+}
+
+// _lib/actions.ts
+export async function submitComment(formData: FormData) {
+  'use server';
+  try {
+    await addComment(...);
+    revalidatePath('/timeline');
+  } catch (err) {
+    if (err instanceof FirestoreError && err.code === 'permission-denied') {
+      throw new Error('権限がありません');
+    }
+    throw err;
+  }
+}
+```
+
+### 14. ページ固有のリファクタリング優先度
+
+**高優先度（性能インパクト大）:**
+1. app/timeline/page.tsx (902行)
+   - タイムラインフィード → TimelineSection コンポーネント化
+   - フィルター UI → FilterBar コンポーネント化
+   - アルバムカード列 → AlbumList コンポーネント化
+
+2. app/user/[id]/page.tsx (2080行) ⚠️ 最優先
+   - プロフィール情報 → ProfileHeader コンポーネント化
+   - タブ切り替え UI → ProfileTabs コンポーネント化
+   - 各タブコンテンツ → ProfileContent/* コンポーネント化
+
+3. app/search/page.tsx (453行)
+   - 検索結果セクション → SearchResults コンポーネント化
+   - 各カテゴリ結果 → SearchCategory* コンポーネント化
+
+**中優先度:**
+4. app/album/[id]/page.tsx (463行)
+   - アルバムヘッダー → AlbumHeader コンポーネント化（既存）
+   - ギャラリー → GallerySection コンポーネント化（既存）
+   - コメント → CommentsSection コンポーネント化
+
+### 15. Suspense & Streaming の活用
+
+15.1 重い処理の段階的ロード
+```typescript
+// page.tsx
+export default async function Page() {
+  return (
+    <>
+      <ProfileHeader /> {/* 高速 */}
+      <Suspense fallback={<SkeletonCards />}>
+        <AlbumsList /> {/* 遅い */}
+      </Suspense>
+    </>
+  );
+}
+```
+
+15.2 キャッシュ戦略
+```typescript
+// _lib/queries.ts
+export async function fetchAlbums(userId: string) {
+  // 1分間キャッシュ
+  return getCachedData(
+    `albums-${userId}`,
+    () => db.collection('albums')
+      .where('ownerId', '==', userId)
+      .get(),
+    { revalidate: 60 }
+  );
+}
+```
+
+### 16. 測定とモニタリング
+
+16.1 Web Vitals の監視
+- LCP（Largest Contentful Paint）の削減が優先
+- INP（Interaction to Next Paint）の最適化
+
+16.2 リファクタリング前後の比較
+```bash
+# 前後でビルドサイズを比較
+npm run build -- --analyze
+
+# Lighthouse 測定
+lighthouse https://local:3000
+```
+
+### 17. Virtualbum 専用チェックリスト
+
+リファクタリング完了時の確認：
+
+- [ ] Server Component と Client Component が明確に分離
+- [ ] Firestore クエリが _lib/queries.ts に集約
+- [ ] 認証・権限チェックが firebase-admin で実施
+- [ ] useAuthUser による認証状態取得が統一
+- [ ] 無限スクロール実装が最適化（重複フェッチなし）
+- [ ] 画像遅延ロードが next/image で実装
+- [ ] リアルタイム更新が局所的（全体再フェッチなし）
+- [ ] エラーハンドリングが統一
+- [ ] Suspense による段階的ロード実装
+- [ ] ページ読み込み時間が30%以上削減確認
+
+---
+
+## 18. リファクタリング実施ログ
+
+### 2026-01-14 - Phase 1: プロフィールページUI分離
+
+**実施内容:**
+
+1. **カスタムフック抽出** (`app/user/[id]/_lib/hooks/`)
+   - `useProfile.ts` (158行): プロフィールデータ・タグ管理
+   - `useSocialActions.ts` (391行): フレンド/ウォッチ/ブロック/ミュート
+   - `useProfileTabs.ts` (901行): タブコンテンツ・アルバムアクション
+   - `useDeleteAccount.ts` (124行): アカウント削除処理
+
+2. **UIコンポーネント抽出** (`app/user/[id]/_components/`)
+   - `ProfileHeader.tsx` (199行): アバター・名前・自己紹介・タグ
+   - `ProfileTabs.tsx` (57行): タブナビゲーション
+   - `ProfileActions.tsx` (100行): ソーシャルアクションボタン群
+
+3. **共有コンポーネント** (`app/_shared/components/`)
+   - `UserListModal.tsx` (85行): Watchers/Friendsリスト表示モーダル
+
+**結果:**
+- Before: `page.tsx` 2081行
+- After: `page.tsx` 582行 (72%削減)
+- 総ファイル数: 9ファイル、合計 2597行
+
+**課題:**
+- `useProfileTabs.ts` がまだ901行と大きい → Phase 2で分割検討
