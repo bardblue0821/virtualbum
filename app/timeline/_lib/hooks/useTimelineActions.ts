@@ -20,6 +20,7 @@ interface UseTimelineActionsProps {
   resortTimeline: () => void;
   userCacheRef: React.MutableRefObject<Map<string, UserRef | null>>;
   setUndoRepostTargetAlbumId: (id: string | null) => void;
+  setConfirmRepostTargetAlbumId: (id: string | null) => void;
 }
 
 interface UseTimelineActionsReturn {
@@ -41,6 +42,7 @@ export function useTimelineActions({
   resortTimeline,
   userCacheRef,
   setUndoRepostTargetAlbumId,
+  setConfirmRepostTargetAlbumId,
 }: UseTimelineActionsProps): UseTimelineActionsReturn {
   const handleToggleLike = useCallback(
     async (albumId: string) => {
@@ -157,76 +159,10 @@ export function useTimelineActions({
         return;
       }
 
-      // optimistic update
-      setRows((prev) => {
-        const bumped = prev.map((r) =>
-          r.album.id === albumId ? ({ ...r, reposted: true, repostCount: (r.repostCount || 0) + 1 } as any) : r
-        );
-        if (!row) return bumped;
-        const newCreatedAt = new Date();
-        const newRow: TimelineItemVM = {
-          ...row,
-          reposted: true,
-          repostCount: (row.repostCount || 0) + 1,
-          repostedBy: { userId: user.uid, createdAt: newCreatedAt },
-          imageAdded: undefined,
-        } as any;
-        return [newRow, ...bumped];
-      });
-      resortTimeline();
-
-      // enrich user info
-      (async () => {
-        try {
-          let cu = userCacheRef.current.get(user.uid);
-          if (cu === undefined) {
-            const u = await getUser(user.uid);
-            cu = u
-              ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName }
-              : null;
-            userCacheRef.current.set(user.uid, cu);
-          }
-          const fallbackIcon = (user as any).photoURL || undefined;
-          const enriched = cu || {
-            uid: user.uid,
-            handle: null,
-            iconURL: (fallbackIcon || null) as any,
-            displayName: user.displayName || undefined,
-          };
-          setRows((prev) => {
-            const next = [...prev];
-            const idx = next.findIndex(
-              (r) => r.album.id === albumId && (r.repostedBy as any)?.userId === user.uid && !(r as any).imageAdded
-            );
-            if (idx >= 0) {
-              next[idx] = { ...next[idx], repostedBy: { ...(next[idx].repostedBy as any), user: enriched } } as any;
-            }
-            return next;
-          });
-        } catch {}
-      })();
-
-      try {
-        const token = await user.getIdToken();
-        const res = await fetch("/api/reposts/toggle", {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-          body: JSON.stringify({ albumId, userId: user.uid }),
-        });
-        if (!res.ok) {
-          await toggleRepost(albumId, user.uid);
-        }
-      } catch {
-        // rollback
-        updateRowByAlbumId(albumId, (r) => ({
-          ...r,
-          reposted: false,
-          repostCount: Math.max(0, (r.repostCount || 0) - 1),
-        }));
-        resortTimeline();
-      }
+      // Show confirmation modal before reposting
+      setConfirmRepostTargetAlbumId(albumId);
     },
-    [user, rowsRef, setRows, resortTimeline, userCacheRef, updateRowByAlbumId, setUndoRepostTargetAlbumId]
+    [user, rowsRef, setUndoRepostTargetAlbumId, setConfirmRepostTargetAlbumId]
   );
 
   const handleSubmitComment = useCallback(

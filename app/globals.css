@@ -19,6 +19,11 @@
   --watch: #0ea5e9; /* sky-500 */
   --friend: #f97316; /* orange-500 */
   --surface-weak: #484848;
+  /* Semantic colors */
+  --error: #dc2626; /* red-600 */
+  --warning: #f59e0b; /* amber-500 */
+  --success: #10b981; /* emerald-500 */
+  --info: #2563eb; /* blue-600 */
 }
 
 /* ライトモード */
@@ -34,6 +39,11 @@
   --watch: #0ea5e9; /* sky-500 */
   --friend: #f97316; /* orange-500 */
   --surface-weak: #f3f4f6; /* gray-100 */
+  /* Semantic colors */
+  --error: #dc2626; /* red-600 */
+  --warning: #f59e0b; /* amber-500 */
+  --success: #10b981; /* emerald-500 */
+  --info: #2563eb; /* blue-600 */
 }
 
 /* スクロールバー出現/消失による横ズレ（特にWindows）を防ぐ */
@@ -76,54 +86,73 @@ h1 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
 h2 { font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; }
 h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
 
+/* --------------------------------------
+   Common focus ring
+   目的: フォーカス状態の統一とアクセシビリティ向上
+--------------------------------------- */
+button:focus-visible,
+a:focus-visible,
+[class*="btn-accent"]:focus-visible,
+.accent-ring:focus-visible,
+.input-underline:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.input-underline:focus-visible {
+  outline: none; /* Input は下線スタイルを優先 */
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 0 var(--accent);
+}
+
+.input-underline.error:focus-visible {
+  border-bottom-color: var(--error);
+  box-shadow: 0 1px 0 0 var(--error);
+}
+
 
 
 /* --------------------------------------
    Accent utility classes (最小ユーティリティ)
    目的: ボタンやリンクの色変更を CSS 変数差し替えのみで完了させる
 --------------------------------------- */
-.btn-accent {
+/* Common button base styles */
+[class*="btn-accent"] {
   background-color: var(--accent);
   color: var(--accent-fg);
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  line-height: 1.25;
-  transition: background-color 0.15s, box-shadow 0.15s;
-}
-.btn-accent:hover {
-  background-color: var(--accent-hover);
-}
-.btn-accent:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-accent:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Square accent button for icon-only controls in nav */
-.btn-accent-square {
-  background-color: var(--accent);
   border-radius: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: background-color 0.15s, box-shadow 0.15s;
 }
-.btn-accent-square:hover { background-color: var(--accent-hover); }
-.btn-accent-square:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+
+[class*="btn-accent"]:hover {
+  background-color: var(--accent-hover);
+}
+
+[class*="btn-accent"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Specific button variants */
+.btn-accent {
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  gap: 0.5rem;
+  line-height: 1.25;
+}
+
+/* Square accent button for icon-only controls in nav */
+.btn-accent-square {
+  /* Inherits all styles from [class*="btn-accent"] */
+  padding: 0.5rem;
 }
 
 /* SideNav dark-specific background */
 .sidenav-bg { background-color: var(--background); }
-:root.theme-dark .sidenav-bg { background-color: #000000; }
+:root.theme-dark .sidenav-bg { background-color: var(--background); }
 
 .link-accent {
   color: var(--accent);
@@ -144,11 +173,7 @@ a { text-decoration: none; }
 a:hover { color: var(--accent); text-decoration: none !important; }
 /* Tailwind の hover:underline ユーティリティを無効化（グローバル方針に合わせる） */
 .hover\:underline:hover { text-decoration: none !important; }
-/* キーボード操作のアクセシビリティ向上: フォーカス時は視認性を確保 */
-a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* Optional focus ring helper (Tailwind の ring を使わない場面向け) */
-.accent-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* フォーカススタイルは上記の共通ルールで定義済み */
 
 /* --------------------------------------
    Underline input style
@@ -165,24 +190,17 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   line-height: 1.4;
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
-.input-underline:focus-visible {
-  outline: none;
-  border-bottom-color: var(--accent);
-  box-shadow: 0 1px 0 0 var(--accent);
-}
+/* フォーカススタイルは上記の共通ルールで定義済み */
 .input-underline::placeholder { color: var(--muted); opacity: 0.7; }
 .input-underline:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 .input-underline.error {
-  border-bottom-color: #dc2626; /* red-600 */
-  box-shadow: 0 1px 0 0 #dc2626;
+  border-bottom-color: var(--error);
+  box-shadow: 0 1px 0 0 var(--error);
 }
-.input-underline.error:focus-visible {
-  border-bottom-color: #dc2626;
-  box-shadow: 0 1px 0 0 #dc2626;
-}
+/* エラー時のフォーカススタイルは上記の共通ルールで定義済み */
 
 /* Password strength meter */
 .pw-strength-wrapper { display:flex; flex-direction:column; gap:0.25rem; }
@@ -190,7 +208,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   position: relative;
   height: 6px;
   width: 100%;
-  background: #484848;
+  background: var(--surface-weak);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -202,10 +220,10 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   transition: width 0.25s ease, background-color 0.25s ease;
 }
 .pw-strength-label { font-size: 0.65rem; letter-spacing: 0.5px; color: var(--muted); }
-.pw-strength-weak span { background:#dc2626; }
-.pw-strength-fair span { background:#f59e0b; }
-.pw-strength-good span { background:#0d9488; }
-.pw-strength-strong span { background:#2563eb; }
+.pw-strength-weak span { background: var(--error); }
+.pw-strength-fair span { background: var(--warning); }
+.pw-strength-good span { background: var(--accent); }
+.pw-strength-strong span { background: var(--info); }
 
 /* --------------------------------------
    Toast Animations

@@ -56,7 +56,6 @@ export default function NotificationsPage(){
   const [friendState, setFriendState] = useState<Record<string, 'pending'|'accepted'|'none'>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
-  const [groupMode, setGroupMode] = useState(true); // まとめ表示モード
   const { show } = useToast();
 
   // 通知をグループ化する関数
@@ -209,24 +208,13 @@ export default function NotificationsPage(){
     <div className="max-w-2xl mx-auto p-4">
       <div className="flex items-center justify-between mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">
         <h1 className="text-2xl font-semibold">通知</h1>
-        <button
-          type="button"
-          onClick={() => setGroupMode(!groupMode)}
-          className={`px-3 py-1 rounded-full text-xs transition-colors ${
-            groupMode 
-              ? 'bg-[var(--accent)] text-white' 
-              : 'bg-muted/10 text-foreground hover:bg-muted/20'
-          }`}
-        >
-          {groupMode ? 'まとめ表示' : '個別表示'}
-        </button>
       </div>
   {loading && <p className="text-sm fg-subtle">読み込み中...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
   {!loading && rows.length === 0 && <p className="text-sm fg-subtle">通知はありません。</p>}
 
-      {/* グループ表示モード */}
-      {groupMode && grouped.length > 0 && (
+      {/* まとめ表示（常時有効） */}
+      {grouped.length > 0 && (
         <ul className="divide-y divide-line">
           {grouped.map(g => {
             const firstNotification = g.notifications[0];
@@ -298,82 +286,6 @@ export default function NotificationsPage(){
             );
           })}
         </ul>
-      )}
-
-      {/* 個別表示モード */}
-      {!groupMode && rows.length > 0 && (
-      <ul className="divide-y divide-line">
-        {rows.map(r => {
-          const isUnread = !r.readAt;
-          const actor = actors[r.actorId];
-          const targetHref = getNotificationHref(r, actor);
-          const fState = r.type === 'friend_request' ? friendState[r.actorId] : undefined;
-          const canActOnFriend = r.type === 'friend_request' && fState === 'pending';
-          const actorName = formatActorName(actor, r.actorId);
-          const actionText = formatActionText(r);
-          return (
-            <li key={r.id} className={`py-3 text-sm ${isUnread ? 'surface-alt' : ''}`}>
-              <div className="flex flex-col items-start gap-2">
-                {/* 誰が: アイコン + 通知種類の絵文字 */}
-                <div className="flex items-center gap-2">
-                  <Link href={`/user/${actor?.handle || r.actorId}`} className="block" aria-label="プロフィールへ">
-                    {actor?.iconURL ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img 
-                        src={actor.iconURL} 
-                        alt="" 
-                        className="h-12 w-12 rounded-md object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-md surface-alt text-[12px] fg-muted">
-                        {(actorName || '?').slice(0,1)}
-                      </span>
-                    )}
-                  </Link>
-                  <span className="text-xl" aria-label={r.type}>{getNotificationEmoji(r.type)}</span>
-                </div>
-                <div className="flex items-start justify-between gap-2 w-full">
-                  <div className="space-y-1">
-                    {/* 「誰が」「何に」「何をしたか」 */}
-                    {targetHref ? (
-                      <Link href={targetHref} className="text-foreground hover:text-foreground">
-                        <span className="font-medium">{actorName}</span>{actionText}
-                      </Link>
-                    ) : (
-                      <p><span className="font-medium">{actorName}</span>{actionText}</p>
-                    )}
-                  {/* コメント本文を表示 */}
-                  {r.type === 'comment' && r.commentBody && (
-                    <p className="text-sm text-muted mt-1">「{r.commentBody}」</p>
-                  )}
-                  {r.type === 'friend_request' && (
-                    <div className="text-xs fg-muted flex flex-wrap items-center gap-2">
-                      {canActOnFriend && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleAccept(r.actorId)}
-                            className="rounded bg-blue-600 px-2 py-0.5 text-[11px] text-white"
-                          >承認</button>
-                          <button
-                            type="button"
-                            onClick={() => handleDecline(r.actorId)}
-                            className="rounded bg-red-600 px-2 py-0.5 text-[11px] text-white"
-                          >拒否</button>
-                        </>
-                      )}
-                      {fState === 'accepted' && <span className="text-green-600">承認済み</span>}
-                      {fState === 'none' && <span className="fg-subtle">状態: 不明</span>}
-                    </div>
-                  )}
-                  <p className="text-[11px] text-muted">{formatDate(r.createdAt)}</p>
-                  </div>
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
       )}
     </div>
   );

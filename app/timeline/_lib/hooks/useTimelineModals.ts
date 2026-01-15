@@ -35,6 +35,12 @@ interface UseTimelineModalsReturn {
   setUndoRepostTargetAlbumId: (id: string | null) => void;
   undoRepostBusy: boolean;
   handleConfirmUndoRepost: () => Promise<void>;
+
+  // Confirm repost modal (new)
+  confirmRepostTargetAlbumId: string | null;
+  setConfirmRepostTargetAlbumId: (id: string | null) => void;
+  confirmRepostBusy: boolean;
+  handleConfirmRepost: () => Promise<void>;
 }
 
 /**
@@ -61,6 +67,10 @@ export function useTimelineModals({
   // Undo repost state
   const [undoRepostTargetAlbumId, setUndoRepostTargetAlbumId] = useState<string | null>(null);
   const [undoRepostBusy, setUndoRepostBusy] = useState(false);
+
+  // Confirm repost state (for new reposts)
+  const [confirmRepostTargetAlbumId, setConfirmRepostTargetAlbumId] = useState<string | null>(null);
+  const [confirmRepostBusy, setConfirmRepostBusy] = useState(false);
 
   const handleConfirmDelete = useCallback(async () => {
     const albumId = deleteTargetAlbumId;
@@ -160,6 +170,46 @@ export function useTimelineModals({
     }
   }, [undoRepostTargetAlbumId, user, setRows, resortTimeline, updateRowByAlbumId]);
 
+  // Confirm repost handler
+  const handleConfirmRepost = useCallback(async () => {
+    const albumId = confirmRepostTargetAlbumId;
+    if (!albumId || !user) return;
+
+    setConfirmRepostBusy(true);
+
+    // Optimistic update
+    updateRowByAlbumId(albumId, (r) => ({
+      ...r,
+      reposted: true,
+      repostCount: (r.repostCount || 0) + 1,
+    }));
+    resortTimeline();
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/reposts/toggle", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        throw new Error("Repost failed");
+      }
+      setConfirmRepostTargetAlbumId(null);
+    } catch {
+      // rollback
+      updateRowByAlbumId(albumId, (r) => ({
+        ...r,
+        reposted: false,
+        repostCount: Math.max(0, (r.repostCount || 0) - 1),
+      }));
+      resortTimeline();
+      setConfirmRepostTargetAlbumId(null);
+    } finally {
+      setConfirmRepostBusy(false);
+    }
+  }, [confirmRepostTargetAlbumId, user, updateRowByAlbumId, resortTimeline]);
+
   return {
     deleteTargetAlbumId,
     setDeleteTargetAlbumId,
@@ -173,5 +223,9 @@ export function useTimelineModals({
     setUndoRepostTargetAlbumId,
     undoRepostBusy,
     handleConfirmUndoRepost,
+    confirmRepostTargetAlbumId,
+    setConfirmRepostTargetAlbumId,
+    confirmRepostBusy,
+    handleConfirmRepost,
   };
 }

@@ -45,6 +45,7 @@ export type AlbumData = {
   ownerId: string;
   title?: string | null;
   visibility?: 'public' | 'friends';
+  tags?: string[];
   createdAt?: FirestoreTimestamp | Date | number;
 };
 

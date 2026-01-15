@@ -5,6 +5,7 @@ import { Button } from "../ui/Button";
 import AlbumActionsMenu from "../album/AlbumActionsMenu";
 import ShareMenu from "../album/ShareMenu";
 import { useTimelineItemVisibility } from "@/src/hooks/useTimelineItemVisibility";
+import { TagList } from "../common/TagList";
 
 // サブコンポーネント
 import { ImageGrid } from "./ImageGrid";
@@ -127,6 +128,11 @@ export function TimelineItem(props: TimelineItemProps) {
           </span>
         </a>
       </div>
+
+      {/* アルバムタグ */}
+      {album.tags && album.tags.length > 0 && (
+        <TagList tags={album.tags} />
+      )}
 
       {/* アクションバー + リアクション (一行表示) */}
       <div className="flex items-center gap-4 flex-wrap">

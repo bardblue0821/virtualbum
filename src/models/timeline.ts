@@ -5,7 +5,7 @@ export type UserRef = {
   displayName?: string;
 };
 
-export type AlbumVM = { id: string; ownerId: string; title?: string | null; createdAt?: any };
+export type AlbumVM = { id: string; ownerId: string; title?: string | null; createdAt?: any; tags?: string[] };
 
 export type ImgVM = { url: string; thumbUrl?: string; uploaderId?: string };
 

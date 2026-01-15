@@ -28,6 +28,7 @@ const messages: Record<string, string> = {
   MISSING_PASSWORD: 'パスワードを入力してください',
   MISSING_EMAIL: 'メールアドレスが取得できません。再ログインしてください。',
   'permission-denied': '権限がありません（アルバムの公開範囲・フレンド関係をご確認ください）',
+  'failed-precondition': '検索機能の準備中です。しばらくしてからお試しください。',
 };
 
 export function translateError(e: unknown): string {

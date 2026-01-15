@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Avatar from '@/components/profile/Avatar';
 import EditPencilIcon from '@/components/icons/EditPencilIcon';
 import ShareButton from '@/components/icons/ShareButton';
+import { TagList } from '@/components/common/TagList';
 
 interface ProfileHeaderProps {
   profile: {
@@ -175,22 +176,11 @@ export default function ProfileHeader({
 
       {/* ユーザータグ */}
       <div className="space-y-1">
-        <div className="flex flex-wrap gap-1">
-          {userTags.length > 0 ? (
-            userTags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => router.push(`/search?q=${encodeURIComponent(tag)}`)}
-                className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer"
-              >
-                #{tag}
-              </button>
-            ))
-          ) : (
-            isMe && <span className="text-xs text-muted">タグなし</span>
-          )}
-        </div>
+        {userTags.length > 0 ? (
+          <TagList tags={userTags} />
+        ) : (
+          isMe && <span className="text-xs text-muted">タグなし</span>
+        )}
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}

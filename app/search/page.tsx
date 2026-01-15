@@ -7,6 +7,7 @@ import { searchUsersByTag, searchAlbumsByTagRich } from "../../lib/repos/tagRepo
 import { translateError } from "../../lib/errors";
 import Avatar from "@/components/profile/Avatar";
 import { SearchAlbumCard } from "@/components/search/SearchAlbumCard";
+import { TagList } from "@/components/common/TagList";
 
 const PAGE_SIZE = 20;
 
@@ -409,13 +410,11 @@ export default function SearchPage() {
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">{u.displayName || "名前未設定"}</div>
                     <div className="text-xs fg-subtle truncate">@{u.handle || u.uid.slice(0, 6)}</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {u.tags.map((tag) => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
+                    {u.tags.length > 0 && (
+                      <div className="mt-1">
+                        <TagList tags={u.tags} />
+                      </div>
+                    )}
                   </div>
                 </Link>
               </li>

@@ -45,6 +45,7 @@ export default function TimelinePage() {
     resortTimeline: feed.resortTimeline,
     userCacheRef: feed.userCacheRef,
     setUndoRepostTargetAlbumId: modals.setUndoRepostTargetAlbumId,
+    setConfirmRepostTargetAlbumId: modals.setConfirmRepostTargetAlbumId,
   });
 
   // Filters
@@ -178,6 +179,38 @@ export default function TimelinePage() {
                 disabled={modals.undoRepostBusy}
               >
                 {modals.undoRepostBusy ? "処理中..." : "取り消す"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Repost Modal */}
+      {modals.confirmRepostTargetAlbumId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-80 rounded bg-background border border-line p-4 shadow-lg">
+            <h3 className="text-sm font-semibold">リポストしますか？</h3>
+            <p className="mt-2 text-xs text-muted/80">このアルバムをあなたのフォロワーに共有します。</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded bg-surface-weak border border-line px-3 py-1 text-xs"
+                onClick={() => {
+                  if (!modals.confirmRepostBusy) modals.setConfirmRepostTargetAlbumId(null);
+                }}
+                disabled={modals.confirmRepostBusy}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="rounded bg-emerald-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                onClick={() => {
+                  if (!modals.confirmRepostBusy) modals.handleConfirmRepost();
+                }}
+                disabled={modals.confirmRepostBusy}
+              >
+                {modals.confirmRepostBusy ? "処理中..." : "リポスト"}
               </button>
             </div>
           </div>

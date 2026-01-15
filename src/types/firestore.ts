@@ -24,7 +24,7 @@ export interface UserDoc {
 }
 
 export type AlbumVisibility = 'public' | 'friends';
-export interface AlbumDoc { id: string; ownerId: string; title?: string; placeUrl?: string; visibility?: AlbumVisibility; createdAt: Date; updatedAt: Date }
+export interface AlbumDoc { id: string; ownerId: string; title?: string; placeUrl?: string; visibility?: AlbumVisibility; tags?: string[]; createdAt: Date; updatedAt: Date }
 export interface AlbumImageDoc { id: string; albumId: string; uploaderId: string; url: string; thumbUrl?: string; createdAt: Date }
 export interface CommentDoc { id: string; albumId: string; userId: string; body: string; createdAt: Date }
 export interface LikeDoc { id: string; albumId: string; userId: string; createdAt: Date }

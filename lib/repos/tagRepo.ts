@@ -97,22 +97,32 @@ export async function searchUsersByTag(
   tag: string,
   limitCount = 20
 ): Promise<Array<{ uid: string; displayName: string; handle: string | null; iconURL: string | null; tags: string[] }>> {
-  const q = query(
-    collection(db, COL.users),
-    where('tags', 'array-contains', tag),
-    limit(limitCount)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      uid: d.id,
-      displayName: data.displayName || '',
-      handle: data.handle || null,
-      iconURL: data.iconURL || null,
-      tags: Array.isArray(data.tags) ? data.tags : [],
-    };
-  });
+  try {
+    const q = query(
+      collection(db, COL.users),
+      where('tags', 'array-contains', tag),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        uid: d.id,
+        displayName: data.displayName || '',
+        handle: data.handle || null,
+        iconURL: data.iconURL || null,
+        tags: Array.isArray(data.tags) ? data.tags : [],
+      };
+    });
+  } catch (e: any) {
+    // FAILED_PRECONDITION (インデックス不足) の場合は空配列を返す
+    const msg = String(e?.code || e?.message || '');
+    if (msg.includes('failed-precondition') || msg.toLowerCase().includes('index')) {
+      console.warn('searchUsersByTag: index not ready, returning empty', e);
+      return [];
+    }
+    throw e;
+  }
 }
 
 // ==================== アルバムタグ ====================
@@ -162,22 +172,32 @@ export async function searchAlbumsByTag(
   tag: string,
   limitCount = 20
 ): Promise<Array<{ id: string; title: string; ownerId: string; coverImageURL: string | null; tags: string[] }>> {
-  const q = query(
-    collection(db, COL.albums),
-    where('tags', 'array-contains', tag),
-    limit(limitCount)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      title: data.title || '',
-      ownerId: data.ownerId || '',
-      coverImageURL: data.coverImageURL || null,
-      tags: Array.isArray(data.tags) ? data.tags : [],
-    };
-  });
+  try {
+    const q = query(
+      collection(db, COL.albums),
+      where('tags', 'array-contains', tag),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        title: data.title || '',
+        ownerId: data.ownerId || '',
+        coverImageURL: data.coverImageURL || null,
+        tags: Array.isArray(data.tags) ? data.tags : [],
+      };
+    });
+  } catch (e: any) {
+    // FAILED_PRECONDITION (インデックス不足) の場合は空配列を返す
+    const msg = String(e?.code || e?.message || '');
+    if (msg.includes('failed-precondition') || msg.toLowerCase().includes('index')) {
+      console.warn('searchAlbumsByTag: index not ready, returning empty', e);
+      return [];
+    }
+    throw e;
+  }
 }
 
 /**
@@ -198,13 +218,24 @@ export async function searchAlbumsByTagRich(
   tags: string[];
   createdAt: any;
 }>> {
-  const q = query(
-    collection(db, COL.albums),
-    where('tags', 'array-contains', tag),
-    orderBy('createdAt', 'desc'),
-    limit(limitCount)
-  );
-  const snap = await getDocs(q);
+  let snap;
+  try {
+    const q = query(
+      collection(db, COL.albums),
+      where('tags', 'array-contains', tag),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    snap = await getDocs(q);
+  } catch (e: any) {
+    // FAILED_PRECONDITION (インデックス不足) の場合は空配列を返す
+    const msg = String(e?.code || e?.message || '');
+    if (msg.includes('failed-precondition') || msg.toLowerCase().includes('index')) {
+      console.warn('searchAlbumsByTagRich: index not ready, returning empty', e);
+      return [];
+    }
+    throw e;
+  }
   
   // オーナー情報をバッチ取得
   const ownerIds = new Set(snap.docs.map(d => d.data().ownerId).filter(Boolean));
