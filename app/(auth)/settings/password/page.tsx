@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 
 function toHalfWidthAscii(text: string): string {
   return String(text)
@@ -216,9 +217,7 @@ export default function PasswordChangePage() {
           />
         </div>
 
-        {error && (
-          <p className="text-sm text-red-600">{error}</p>
-        )}
+        <ErrorMessage error={error} />
 
         <div className="flex gap-3 pt-2">
           <Button

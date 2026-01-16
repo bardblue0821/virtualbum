@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import type { GroupedNotification, ActorInfo } from '../_lib/types';
-import { getNotificationEmoji, formatDate, formatGroupActionText, getNotificationHref } from '../_lib/utils';
+import { getNotificationEmoji, formatDate, formatGroupActionText, getNotificationHref, NOTIFICATION_DISPLAY } from '../_lib/constants/notification.constants';
 
 interface NotificationItemProps {
   group: GroupedNotification;
@@ -17,22 +17,20 @@ export function NotificationItem({ group, actors }: NotificationItemProps) {
   const notificationCount = group.notifications.length;
   
   // 複数のアクターがいる場合の表示
-  const actorNames = group.actors.slice(0, 3).map(aid => {
+  const actorNames = group.actors.slice(0, NOTIFICATION_DISPLAY.MAX_VISIBLE_ACTORS).map(aid => {
     const a = actors[aid];
     return a?.displayName || a?.handle || aid.slice(0, 6);
   }).join('、');
-  const remainingActors = actorCount > 3 ? `他${actorCount - 3}人` : '';
+  const remainingActors = actorCount > NOTIFICATION_DISPLAY.MAX_VISIBLE_ACTORS ? `他${actorCount - NOTIFICATION_DISPLAY.MAX_VISIBLE_ACTORS}${NOTIFICATION_DISPLAY.REMAINING_ACTORS_SUFFIX}` : '';
 
   return (
     <li className={`py-3 text-sm ${group.isUnread ? 'surface-alt' : ''}`}>
       <div className="flex flex-col items-start gap-2">
         <div className="flex items-center gap-2">
-          {/* 複数アイコンを重ねて表示 */}
           <div className="flex -space-x-2">
-            {group.actors.slice(0, 3).map((aid, idx) => {
+            {group.actors.slice(0, NOTIFICATION_DISPLAY.MAX_VISIBLE_ACTORS).map((aid, idx) => {
               const a = actors[aid];
               return a?.iconURL ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   key={aid}
                   src={a.iconURL} 

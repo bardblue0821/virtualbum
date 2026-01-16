@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useSearch, useSearchHistory, useInfiniteScroll } from "./_lib/hooks";
 import {
   CategoryTabs,
@@ -85,7 +86,7 @@ export default function SearchPage() {
         )}
         
         {loading && <p className="text-xs fg-subtle mt-2">検索中...</p>}
-        {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
+        <ErrorMessage error={err} size="xs" className="mt-2" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

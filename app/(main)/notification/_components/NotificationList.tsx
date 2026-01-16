@@ -3,6 +3,8 @@ import React from 'react';
 import type { GroupedNotification, ActorInfo } from '../_lib/types';
 import { NotificationItem } from './NotificationItem';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
+import { NOTIFICATION_MESSAGES } from '../_lib/constants/notification.constants';
 
 interface NotificationListProps {
   grouped: GroupedNotification[];
@@ -18,11 +20,11 @@ export function NotificationList({ grouped, actors, loading, error, isEmpty }: N
   }
 
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <ErrorMessage error={error} />;
   }
 
   if (isEmpty) {
-    return <p className="text-sm fg-subtle">通知はありません。</p>;
+    return <p className="text-sm fg-subtle">{NOTIFICATION_MESSAGES.EMPTY}</p>;
   }
 
   return (

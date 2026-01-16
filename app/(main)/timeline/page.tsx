@@ -5,6 +5,7 @@ import { TimelineItem } from "@/components/features/timeline/TimelineItem";
 import DeleteConfirmModal from "@/components/features/album/DeleteConfirmModal";
 import ReportConfirmModal from "@/components/features/album/ReportConfirmModal";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useTimelineFeed } from "./_lib/hooks/useTimelineFeed";
 import { useTimelineActions } from "./_lib/hooks/useTimelineActions";
 import { useTimelineModals } from "./_lib/hooks/useTimelineModals";
@@ -61,7 +62,7 @@ export default function TimelinePage() {
     return <LoadingSpinner size="sm" />;
   }
   if (feed.error && feed.rows.length === 0) {
-    return <div className="text-sm text-red-600">{feed.error}</div>;
+    return <ErrorMessage error={feed.error} />;
   }
 
   return (
@@ -126,9 +127,7 @@ export default function TimelinePage() {
         </div>
       )}
 
-      {feed.error && feed.rows.length > 0 && (
-        <div className="mt-4 text-sm text-red-600">{feed.error}</div>
-      )}
+      <ErrorMessage error={feed.error && feed.rows.length > 0 ? feed.error : null} className="mt-4" />
       {feed.loadingMore && <LoadingSpinner size="sm" />}
       <div ref={feed.sentinelRef} className="h-px" />
 

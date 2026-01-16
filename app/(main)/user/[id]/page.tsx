@@ -26,6 +26,7 @@ import { TimelineItem } from '@/components/features/timeline/TimelineItem';
 import GalleryGrid from '@/components/gallery/GalleryGrid';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 
 // Shared components
 import UserListModal, { type UserListItem } from '@/app/(main)/user/[id]/_components/UserListModal';
@@ -264,7 +265,7 @@ export default function ProfilePage() {
         onDeleteAccount={() => setShowDeleteAccount(true)}
       />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <ErrorMessage error={error} />
 
       {/* Friend Remove Confirm Modal */}
       <FriendRemoveConfirmModal
@@ -292,7 +293,7 @@ export default function ProfilePage() {
         /* Main Content Section */
         <section className="space-y-4 pt-4 border-t border-line">
           {loadingExtra && <LoadingSpinner size="sm" />}
-          {extraError && <p className="text-sm text-red-600">{extraError}</p>}
+          <ErrorMessage error={extraError} />
 
           <div className="space-y-4 mt-4">
             {/* Tabs */}
@@ -405,7 +406,7 @@ export default function ProfilePage() {
                 {uploadedLoading && <LoadingSpinner size="sm" />}
                 {uploadedError && (
                   <div className="space-y-1">
-                    <p className="text-sm text-red-600">{uploadedError}</p>
+                    <ErrorMessage error={uploadedError} />
                     {uploadedErrorLink && (
                       <a
                         href={uploadedErrorLink}
@@ -440,7 +441,7 @@ export default function ProfilePage() {
             {isMe && listTab === 'likes' && (
               <div role="tabpanel" aria-label="いいね">
                 {likedLoading && <LoadingSpinner size="sm" />}
-                {likedError && <p className="text-sm text-red-600">{likedError}</p>}
+                <ErrorMessage error={likedError} />
                 {!likedLoading && likedRows.length === 0 && (
                   <p className="text-sm text-muted/80">いいねしたアルバムはまだありません</p>
                 )}

@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { getDisplayNameBlockReason } from '@/lib/constants/userFilters';
 import type { AuthMode } from '../_lib/hooks';
 
@@ -71,9 +72,7 @@ export function AuthForm({
             disabled={loading}
             placeholder="例: VR太郎"
           />
-          {dnBlockReason && (
-            <p className="text-xs text-red-600 mt-1" role="alert">{dnBlockReason}</p>
-          )}
+          <ErrorMessage error={dnBlockReason} size="xs" className="mt-1" />
         </div>
       )}
       
@@ -98,9 +97,7 @@ export function AuthForm({
               {handleStatus === 'invalid' && '形式'}
             </span>
           </div>
-          {handleError && (
-            <p className="text-xs text-red-600 mt-1" role="alert">{handleError}</p>
-          )}
+          <ErrorMessage error={handleError} size="xs" className="mt-1" />
         </div>
       )}
       
@@ -180,13 +177,11 @@ export function AuthForm({
               {showConfirm ? '隠す' : '表示'}
             </button>
           </div>
-          {mismatch && (
-            <p className="text-xs text-red-600 mt-1" role="alert">{mismatch}</p>
-          )}
+          <ErrorMessage error={mismatch} size="xs" className="mt-1" />
         </div>
       )}
       
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      <ErrorMessage error={error} />
       
       {info && (
         <div className="text-xs fg-muted surface-alt border border-base rounded p-2">

@@ -5,6 +5,7 @@ import Avatar from '@/components/features/profile/Avatar';
 import EditPencilIcon from '@/components/icons/EditPencilIcon';
 import ShareButton from '@/components/icons/ShareButton';
 import { TagList } from '@/components/common/TagList';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 
 interface ProfileHeaderProps {
   profile: {
@@ -183,7 +184,7 @@ export default function ProfileHeader({
         )}
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      <ErrorMessage error={error} size="xs" />
     </header>
   );
 }

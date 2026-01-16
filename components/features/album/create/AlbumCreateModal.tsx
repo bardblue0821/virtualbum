@@ -7,6 +7,7 @@ import { translateError } from '@/lib/errors';
 import { isRateLimitError } from '@/lib/rateLimit';
 import { useToast } from '@/components/ui/Toast';
 import { Button as AppButton } from '@/components/ui/Button';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { updateAlbumTags, getAllAlbumTags } from '@/lib/db/repositories/tag.repository';
 import { useAlbumImageUpload } from './hooks/useAlbumImageUpload';
 import { useImageCrop } from './hooks/useImageCrop';
@@ -172,7 +173,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           onOpenCrop={(idx) => imageCrop.openCrop(idx, imageUpload.files, loading)}
         />
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <ErrorMessage error={error} />
         
         {loading && (
           <AlbumUploadProgress progress={progress} fileProgress={fileProgress} />

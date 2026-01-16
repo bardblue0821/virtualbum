@@ -8,6 +8,7 @@ import CommentsSection from "./_components/CommentsSection";
 import DeleteConfirmModal from "@/components/features/album/DeleteConfirmModal";
 import ImageManageModal from "./_components/ImageManageModal";
 import { Button } from "@/components/ui/Button";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useAuthUser } from "@/lib/hooks/useAuthUser";
 import { useToast } from "@/components/ui/Toast";
 import { useThumbBackfill } from "@/lib/hooks/useThumbBackfill";
@@ -239,7 +240,7 @@ export default function AlbumDetailPage() {
         </section>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <ErrorMessage error={error} />
 
       <DeleteConfirmModal
         open={showDeleteConfirm}

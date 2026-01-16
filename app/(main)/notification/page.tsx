@@ -3,6 +3,7 @@ import React from 'react';
 import { useAuthUser } from '@/lib/hooks/useAuthUser';
 import { useNotifications } from './_lib/hooks';
 import { NotificationList } from './_components';
+import { NOTIFICATION_MESSAGES } from './_lib/constants/notification.constants';
 
 export default function NotificationsPage() {
   const { user } = useAuthUser();
@@ -17,7 +18,7 @@ export default function NotificationsPage() {
   if (!user) {
     return (
       <div className="max-w-2xl mx-auto p-4">
-        <p className="text-sm fg-muted">ログインしてください。</p>
+        <p className="text-sm fg-muted">{NOTIFICATION_MESSAGES.NOT_LOGGED_IN}</p>
       </div>
     );
   }

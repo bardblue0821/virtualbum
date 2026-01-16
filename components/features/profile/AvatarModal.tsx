@@ -4,6 +4,7 @@ import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AvatarCropper from './AvatarCropper';
 import { Button, IconButton } from "@/components/ui/Button";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { getCroppedBlob } from '@/lib/services/image/compression';
 import { updateUserIcon } from '@/lib/db/repositories/user.repository';
 
@@ -104,14 +105,14 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
                 <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e)=> onFile(e.target.files?.[0] || undefined)} />
               </div>
             )}
-            {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+            <ErrorMessage error={error} size="xs" />
           </div>
         )}
         {stage === 'crop' && previewSrc && (
           <div>
             <AvatarCropper src={previewSrc} onCancel={()=>{ setStage('view'); setPreviewSrc(null); }} onConfirm={onConfirmCrop} />
             {busy && <p className="text-xs fg-muted mt-2">保存中...</p>}
-            {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+            <ErrorMessage error={error} size="xs" />
           </div>
         )}
       </div>

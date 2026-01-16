@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import TagInput from '@/components/form/TagInput';
 
 interface ProfileEditModalProps {
@@ -114,9 +115,7 @@ export default function ProfileEditModal({
             <p className="text-xs text-muted">最大5つまで設定できます</p>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+          <ErrorMessage error={error} />
 
           {/* ボタン */}
           <div className="flex gap-2 justify-end pt-4">
