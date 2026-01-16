@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { verifyIdToken } from '@/lib/firebase/admin';
 
 // very simple in-memory rate limit (per IP): 5 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;

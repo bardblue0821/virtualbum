@@ -1,8 +1,9 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { adminToggleRepost } from '@/src/repositories/admin/firestore';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { toggleRepost } from '@/lib/db/repositories/repost.repository';
+// TODO: Implement admin functions for better security
+import { verifyIdToken } from '@/lib/firebase/admin';
 
 // very simple in-memory rate limit (per IP): 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     if (decoded && decoded.uid !== userId) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
-    const result = await adminToggleRepost(albumId, userId);
+    const result = await toggleRepost(albumId, userId);
     return NextResponse.json({ ok: true, added: !!result?.added });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });

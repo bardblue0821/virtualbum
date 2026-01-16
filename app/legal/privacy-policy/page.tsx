@@ -8,7 +8,7 @@ const DATE = '2026-01-09';
 
 export default function PrivacyPolicyPage() {
   return (
-    <main style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1rem' }}>
+    <div style={{ maxWidth: 700, margin: '0 auto' }}>
       <h1>プライバシーポリシー</h1>
       <div data-testid="privacy-version" style={{ color: '#888', fontSize: '0.95em', marginBottom: 24 }}>
         {VERSION} / {DATE}
@@ -40,6 +40,6 @@ export default function PrivacyPolicyPage() {
           トップページへ戻る
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

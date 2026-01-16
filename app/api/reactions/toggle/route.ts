@@ -1,11 +1,11 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-// import { toggleReaction } from '@/lib/repos/reactionRepo';
-import { adminToggleReaction } from '@/src/repositories/admin/firestore';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
-import { isEitherBlocking } from '@/lib/repos/blockRepo';
-import { getAlbum } from '@/lib/repos/albumRepo';
+import { toggleReaction } from '@/lib/db/repositories/reaction.repository';
+// TODO: Implement admin functions
+import { verifyIdToken } from '@/lib/firebase/admin';
+import { isEitherBlocking } from '@/lib/db/repositories/block.repository';
+import { getAlbum } from '@/lib/db/repositories/album.repository';
 
 // very simple in-memory rate limit (per IP): 20 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       }
     }
     
-  const result = await adminToggleReaction(albumId, userId, emoji);
+  const result = await toggleReaction(albumId, userId, emoji);
     // result has shape { added: boolean } in repo
     return NextResponse.json({ ok: true, added: !!(result as any)?.added });
   } catch (e: any) {

@@ -8,7 +8,7 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { verifyIdToken, getAdminDb } from '@/src/libs/firebaseAdmin';
+import { verifyIdToken, getAdminDb } from '@/lib/firebase/admin';
 import { COL } from '@/lib/paths';
 
 // レート制限: 20回/60秒（ミュートはブロックより軽い操作なので緩め）

@@ -1,9 +1,9 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-// import { toggleLike } from '@/lib/repos/likeRepo';
-import { adminToggleLike } from '@/src/repositories/admin/firestore';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { toggleLike } from '@/lib/db/repositories/like.repository';
+// TODO: Implement admin functions
+import { verifyIdToken } from '@/lib/firebase/admin';
 
 // very simple in-memory rate limit (per IP): 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     if (decoded && decoded.uid !== userId) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
-  await adminToggleLike(albumId, userId);
+  await toggleLike(albumId, userId);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });

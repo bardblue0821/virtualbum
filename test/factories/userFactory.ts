@@ -3,7 +3,7 @@
  * テスト用ユーザーデータを生成
  */
 
-import type { UserDoc } from '@/src/types/firestore';
+import type { UserDoc } from '@/lib/types/firestore';
 import {
   randomId,
   sequentialId,

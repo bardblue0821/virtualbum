@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@/src/libs/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase/admin';
 import { ipRateLimiter, emailRateLimiter, addTimingJitter } from '@/lib/utils/rateLimit';
 
 /**

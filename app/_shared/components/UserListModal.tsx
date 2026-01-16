@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import Avatar from '@/components/profile/Avatar';
+import Avatar from '@/components/features/profile/Avatar';
 import { Button } from '@/components/ui/Button';
 
 export interface UserListItem {

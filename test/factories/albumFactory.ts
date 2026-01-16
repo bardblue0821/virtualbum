@@ -3,7 +3,7 @@
  * テスト用アルバムデータを生成
  */
 
-import type { AlbumDoc, AlbumVisibility } from '@/src/types/firestore';
+import type { AlbumDoc, AlbumVisibility } from '@/lib/types/firestore';
 import {
   randomId,
   sequentialId,

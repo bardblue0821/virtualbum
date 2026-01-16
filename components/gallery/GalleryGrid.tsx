@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 import PhotoAlbum, { type RenderPhotoProps } from "react-photo-album";
-import { IconButton } from "../ui/Button";
+import { IconButton } from "@/components/ui/Button";
 
 // lightGallery はクライアント側のみで読み込む
 const LightGallery = dynamic(() => import("lightgallery/react"), { ssr: false });

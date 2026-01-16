@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/ui/Button";
 
 // Props aligned with existing FieldText usage in app/user/[id]/page.tsx
 export interface InlineTextFieldProps {

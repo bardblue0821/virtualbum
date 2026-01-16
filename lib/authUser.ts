@@ -1,5 +1,4 @@
-import { getUser, createUser } from './repos/userRepo';
-import { isHandleTaken } from './repos/userRepo';
+import { getUser, createUser, isHandleTaken } from './db/repositories/user.repository';
 import { isHandleBlocked } from './constants/userFilters';
 
 export async function ensureUser(uid: string, displayName?: string | null, email?: string | null, handle?: string | null) {

@@ -22,7 +22,7 @@ jest.mock('@/lib/firebase', () => ({
 
 // blockRepoをテスト用にインポート
 // モックが先に設定されている必要がある
-import * as blockRepo from '@/lib/repos/blockRepo';
+import * as blockRepo from '@/lib/db/repositories/block.repository';
 
 describe('ブロック機能テスト', () => {
   beforeEach(() => {

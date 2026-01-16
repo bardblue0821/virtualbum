@@ -22,7 +22,7 @@ jest.mock('@/lib/firebase', () => ({
 
 // muteRepoをテスト用にインポート
 // モックが先に設定されている必要がある
-import * as muteRepo from '@/lib/repos/muteRepo';
+import * as muteRepo from '@/lib/db/repositories/mute.repository';
 
 describe('ミュート機能テスト', () => {
   beforeEach(() => {

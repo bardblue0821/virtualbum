@@ -1,11 +1,11 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-// import { addComment } from '@/lib/repos/commentRepo';
-import { adminAddComment } from '@/src/repositories/admin/firestore';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
-import { isEitherBlocking } from '@/lib/repos/blockRepo';
-import { getAlbum } from '@/lib/repos/albumRepo';
+import { addComment } from '@/lib/db/repositories/comment.repository';
+// TODO: Implement admin functions for better security
+import { verifyIdToken } from '@/lib/firebase/admin';
+import { isEitherBlocking } from '@/lib/db/repositories/block.repository';
+import { getAlbum } from '@/lib/db/repositories/album.repository';
 
 // very simple in-memory rate limit (per IP): 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    await adminAddComment(albumId, userId, body);
+    await addComment(albumId, userId, body);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error('[comments/add] Error:', e);

@@ -1,7 +1,7 @@
 /**
  * エラーハンドリング統一エクスポート
  */
-import { ERR } from '@/src/types/firestore';
+import { ERR } from '@/lib/types/firestore';
 
 // 構造化されたエラーハンドリング
 export { 

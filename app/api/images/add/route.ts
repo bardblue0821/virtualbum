@@ -1,8 +1,11 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { adminCanUploadMoreImages, adminAddImage, adminGetFriendStatus, adminGetAlbum } from '@/src/repositories/admin/firestore';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { getAlbum } from '@/lib/db/repositories/album.repository';
+import { addImage, canUploadMoreImages } from '@/lib/db/repositories/image.repository';
+import { getFriendStatus } from '@/lib/db/repositories/friend.repository';
+// TODO: Implement admin functions for better security
+import { verifyIdToken } from '@/lib/firebase/admin';
 
 // simple rate limit per IP: 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -49,14 +52,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const album = await adminGetAlbum(albumId);
+    const album = await getAlbum(albumId);
     if (!album) return NextResponse.json({ error: 'ALBUM_NOT_FOUND' }, { status: 404 });
     const isOwner = album.ownerId === userId;
     let isFriend = false;
     try {
       const [forward, backward] = await Promise.all([
-        adminGetFriendStatus(userId, album.ownerId),
-        adminGetFriendStatus(album.ownerId, userId),
+        getFriendStatus(userId, album.ownerId),
+        getFriendStatus(album.ownerId, userId),
       ]);
       isFriend = (forward === 'accepted') || (backward === 'accepted');
     } catch {}
@@ -65,12 +68,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'NO_PERMISSION' }, { status: 403 });
     }
 
-    const allow = await adminCanUploadMoreImages(albumId, userId);
+    const allow = await canUploadMoreImages(albumId, userId);
     if (!allow) {
       return NextResponse.json({ error: 'LIMIT_EXCEEDED' }, { status: 400 });
     }
 
-  await adminAddImage(albumId, userId, url);
+  await addImage(albumId, userId, url);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });

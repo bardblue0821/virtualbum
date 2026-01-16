@@ -1,10 +1,11 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { canUploadMoreImages } from '@/lib/repos/imageRepo';
-import { adminAddImage, adminGetFriendStatus } from '@/src/repositories/admin/firestore';
-import { getAlbumSafe } from '@/lib/repos/albumRepo';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { canUploadMoreImages, addImage } from '@/lib/db/repositories/image.repository';
+import { getAlbumSafe } from '@/lib/db/repositories/album.repository';
+import { getFriendStatus } from '@/lib/db/repositories/friend.repository';
+// TODO: Implement admin functions for better security
+import { verifyIdToken } from '@/lib/firebase/admin';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('api:images:register');
@@ -81,8 +82,8 @@ export async function POST(req: NextRequest) {
     let isFriend = false;
     try {
       const [forward, backward] = await Promise.all([
-        adminGetFriendStatus(userId, album.ownerId),
-        adminGetFriendStatus(album.ownerId, userId),
+        getFriendStatus(userId, album.ownerId),
+        getFriendStatus(album.ownerId, userId),
       ]);
       isFriend = (forward === 'accepted') || (backward === 'accepted');
     } catch (e) {
@@ -116,8 +117,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Admin SDK で Firestore に登録
-    log.debug('calling adminAddImage');
-    await adminAddImage(albumId, userId, url, thumbUrl, alt);
+    log.debug('calling addImage');
+    await addImage(albumId, userId, url, thumbUrl);
     
     log.debug('success');
     return NextResponse.json({ ok: true });

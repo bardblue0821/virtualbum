@@ -1,10 +1,10 @@
 export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { listImages } from '@/lib/repos/imageRepo';
-import { adminDeleteImage } from '@/src/repositories/admin/firestore';
-import { getAlbumSafe } from '@/lib/repos/albumRepo';
-import { verifyIdToken } from '@/src/libs/firebaseAdmin';
+import { listImages, deleteImage } from '@/lib/db/repositories/image.repository';
+import { getAlbumSafe } from '@/lib/db/repositories/album.repository';
+//  TODO: Implement admin functions for better security
+import { verifyIdToken } from '@/lib/firebase/admin';
 
 // simple rate limit per IP: 20 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   const canDelete = isOwner || (uploaderId && uploaderId === userId);
     if (!canDelete) return NextResponse.json({ error: 'NO_PERMISSION' }, { status: 403 });
 
-  await adminDeleteImage(imageId);
+  await deleteImage(imageId);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });

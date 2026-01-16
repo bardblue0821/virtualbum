@@ -8,7 +8,7 @@ const DATE = '2026-01-09';
 
 export default function FAQPage() {
   return (
-    <main style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1rem' }}>
+    <div style={{ maxWidth: 700, margin: '0 auto' }}>
       <h1>よくある質問</h1>
       <div data-testid="faq-version" style={{ color: '#888', fontSize: '0.95em', marginBottom: 24 }}>
         {VERSION} / {DATE}
@@ -45,6 +45,6 @@ export default function FAQPage() {
           トップページへ戻る
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

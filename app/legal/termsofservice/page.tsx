@@ -6,7 +6,7 @@ const POLICY_DATE = "2026-01-09";
 
 export default function TermsOfServicePage() {
   return (
-    <main className="max-w-2xl mx-auto py-8 px-4">
+    <div className="max-w-2xl mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl font-bold mb-2">利用規約</h1>
         <div className="text-sm text-gray-500" data-testid="policy-version">
@@ -44,6 +44,6 @@ export default function TermsOfServicePage() {
           トップページへ戻る
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

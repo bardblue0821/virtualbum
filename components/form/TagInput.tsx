@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { validateTag, filterTagCandidates } from '@/lib/repos/tagRepo';
+import { validateTag, filterTagCandidates } from '@/lib/db/repositories/tag.repository';
 
 export interface TagInputProps {
   /** 現在のタグリスト */
