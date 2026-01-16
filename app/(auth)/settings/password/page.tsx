@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 function toHalfWidthAscii(text: string): string {
   return String(text)
@@ -112,7 +113,7 @@ export default function PasswordChangePage() {
   if (authLoading) {
     return (
       <div className="max-w-md mx-auto p-6">
-        <p className="text-sm text-muted/80">読み込み中...</p>
+        <LoadingSpinner size="sm" />
       </div>
     );
   }

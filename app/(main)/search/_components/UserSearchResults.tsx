@@ -3,6 +3,7 @@ import React from "react";
 import Link from "next/link";
 import Avatar from "@/components/features/profile/Avatar";
 import { UserHit } from "@/lib/db/repositories/search.repository";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface UserSearchResultsProps {
   users: UserHit[];
@@ -58,7 +59,7 @@ export function UserSearchResults({
         ))}
       </ul>
       {hasMore && <div ref={sentinelRef} className="h-4" />}
-      {loadingMore && <p className="text-xs fg-subtle mt-1">読み込み中...</p>}
+      {loadingMore && <LoadingSpinner size="xs" />}
     </section>
   );
 }

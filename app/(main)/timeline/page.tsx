@@ -4,6 +4,7 @@ import { useAuthUser } from "@/lib/hooks/useAuthUser";
 import { TimelineItem } from "@/components/features/timeline/TimelineItem";
 import DeleteConfirmModal from "@/components/features/album/DeleteConfirmModal";
 import ReportConfirmModal from "@/components/features/album/ReportConfirmModal";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useTimelineFeed } from "./_lib/hooks/useTimelineFeed";
 import { useTimelineActions } from "./_lib/hooks/useTimelineActions";
 import { useTimelineModals } from "./_lib/hooks/useTimelineModals";
@@ -57,7 +58,7 @@ export default function TimelinePage() {
   });
 
   if (feed.loading && feed.rows.length === 0) {
-    return <div className="text-sm text-muted/80">読み込み中...</div>;
+    return <LoadingSpinner size="sm" />;
   }
   if (feed.error && feed.rows.length === 0) {
     return <div className="text-sm text-red-600">{feed.error}</div>;
@@ -128,7 +129,7 @@ export default function TimelinePage() {
       {feed.error && feed.rows.length > 0 && (
         <div className="mt-4 text-sm text-red-600">{feed.error}</div>
       )}
-      {feed.loadingMore && <div className="mt-4 text-sm text-muted/80">読み込み中...</div>}
+      {feed.loadingMore && <LoadingSpinner size="sm" />}
       <div ref={feed.sentinelRef} className="h-px" />
 
       {/* Modals */}

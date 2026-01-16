@@ -2,6 +2,7 @@
 import React from "react";
 import { SearchAlbumCard } from "@/components/features/search/SearchAlbumCard";
 import { AlbumHit } from "@/lib/db/repositories/search.repository";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface AlbumSearchResultsProps {
   albums: AlbumHit[];
@@ -45,7 +46,7 @@ export function AlbumSearchResults({
         ))}
       </div>
       {hasMore && <div ref={sentinelRef} className="h-4" />}
-      {loadingMore && <p className="text-xs fg-subtle mt-1">読み込み中...</p>}
+      {loadingMore && <LoadingSpinner size="xs" />}
     </section>
   );
 }

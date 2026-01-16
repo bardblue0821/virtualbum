@@ -2,6 +2,7 @@
 import React from 'react';
 import Avatar from '@/components/features/profile/Avatar';
 import { Button } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export interface UserListItem {
   uid: string;
@@ -45,7 +46,7 @@ export default function UserListModal({
           {title}（{count}）
         </h3>
 
-        {loading && <p className="text-xs text-muted/80">読み込み中...</p>}
+        {loading && <LoadingSpinner size="xs" />}
 
         {!loading && users && users.length > 0 ? (
           <ul className="max-h-80 overflow-auto divide-y divide-line">

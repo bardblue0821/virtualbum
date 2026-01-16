@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/firebase';
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { Button } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -275,10 +276,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-page px-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-sm fg-secondary">読み込み中...</p>
-        </div>
+        <LoadingSpinner fullScreen />
       </div>
     }>
       <ResetPasswordContent />

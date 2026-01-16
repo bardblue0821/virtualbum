@@ -2,6 +2,7 @@
 import React from 'react';
 import type { GroupedNotification, ActorInfo } from '../_lib/types';
 import { NotificationItem } from './NotificationItem';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface NotificationListProps {
   grouped: GroupedNotification[];
@@ -13,7 +14,7 @@ interface NotificationListProps {
 
 export function NotificationList({ grouped, actors, loading, error, isEmpty }: NotificationListProps) {
   if (loading) {
-    return <p className="text-sm fg-subtle">読み込み中...</p>;
+    return <LoadingSpinner size="sm" />;
   }
 
   if (error) {

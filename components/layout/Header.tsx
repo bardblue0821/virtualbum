@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export default function Header() {
   const { user, loading } = useAuthUser();
@@ -140,7 +141,7 @@ export default function Header() {
             role="menu"
           >
             {loading && (
-              <p className="px-4 py-2 text-sm fg-subtle" role="status">読み込み中...</p>
+              <div className="px-4 py-2"><LoadingSpinner size="xs" /></div>
             )}
             {!loading && user && (
               <>

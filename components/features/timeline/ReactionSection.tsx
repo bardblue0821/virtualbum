@@ -5,6 +5,7 @@ import type { ReactionData } from "./types";
 import { REACTION_CATEGORIES, filterReactionEmojis } from "@/lib/constants/reactions";
 import { listReactorsByAlbumEmoji, Reactor } from "@/lib/db/repositories/reaction.repository";
 import { getOptimizedImageUrl } from "@/lib/utils/imageUrl";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface ReactionSectionProps {
   albumId: string;
@@ -207,7 +208,7 @@ function ReactionChip({
         <div className="absolute left-0 top-full mt-1 w-64 rounded border border-line bg-background shadow-lg z-40">
           <div className="p-2">
             <p className="text-[11px] text-muted/80 mb-1">このリアクションをした人</p>
-            {loading && <p className="text-xs text-muted/80">読み込み中...</p>}
+            {loading && <LoadingSpinner size="xs" />}
             {!loading && (
               (reactors && reactors.length > 0) ? (
                 <ul className="max-h-64 overflow-auto divide-y divide-line">

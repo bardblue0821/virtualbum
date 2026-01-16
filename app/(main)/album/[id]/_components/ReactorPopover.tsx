@@ -1,5 +1,6 @@
 import React from "react";
 import type { Reactor } from "@/lib/db/repositories/reaction.repository";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export interface ReactorPopoverProps {
   emoji: string;
@@ -12,7 +13,7 @@ export default function ReactorPopover({ emoji, users, loading }: ReactorPopover
     <div className="absolute left-0 top-full mt-1 w-64 rounded border border-line bg-background shadow-lg z-50">
       <div className="p-2">
         <p className="text-[11px] text-muted mb-1">このリアクションをした人</p>
-        {loading && <p className="text-xs text-muted">読み込み中...</p>}
+        {loading && <LoadingSpinner size="xs" />}
         {!loading && (
           (users && users.length > 0) ? (
             <ul className="max-h-64 overflow-auto divide-y divide-line">

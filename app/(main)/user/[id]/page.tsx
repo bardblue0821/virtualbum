@@ -25,6 +25,7 @@ import ReportConfirmModal from '@/components/features/album/ReportConfirmModal';
 import { TimelineItem } from '@/components/features/timeline/TimelineItem';
 import GalleryGrid from '@/components/gallery/GalleryGrid';
 import { Button } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Shared components
 import UserListModal, { type UserListItem } from '@/app/(main)/user/[id]/_components/UserListModal';
@@ -193,7 +194,7 @@ export default function ProfilePage() {
   ];
 
   // Guard
-  if (loading) return <div className="p-4 text-sm text-muted/80">読み込み中...</div>;
+  if (loading) return <LoadingSpinner size="sm" />;
   if (!profile) return <div className="p-4 text-sm text-muted">ユーザーが見つかりません (handle)</div>;
 
   return (
@@ -290,7 +291,7 @@ export default function ProfilePage() {
       ) : (
         /* Main Content Section */
         <section className="space-y-4 pt-4 border-t border-line">
-          {loadingExtra && <p className="text-sm text-muted/80">読み込み中...</p>}
+          {loadingExtra && <LoadingSpinner size="sm" />}
           {extraError && <p className="text-sm text-red-600">{extraError}</p>}
 
           <div className="space-y-4 mt-4">
@@ -401,7 +402,7 @@ export default function ProfilePage() {
 
             {listTab === 'images' && (
               <div role="tabpanel" aria-label="投稿画像" className="space-y-2">
-                {uploadedLoading && <p className="text-sm text-muted/80">読み込み中...</p>}
+                {uploadedLoading && <LoadingSpinner size="sm" />}
                 {uploadedError && (
                   <div className="space-y-1">
                     <p className="text-sm text-red-600">{uploadedError}</p>
@@ -438,7 +439,7 @@ export default function ProfilePage() {
             {/* Likes tab (self only) */}
             {isMe && listTab === 'likes' && (
               <div role="tabpanel" aria-label="いいね">
-                {likedLoading && <p className="text-sm text-muted/80">読み込み中...</p>}
+                {likedLoading && <LoadingSpinner size="sm" />}
                 {likedError && <p className="text-sm text-red-600">{likedError}</p>}
                 {!likedLoading && likedRows.length === 0 && (
                   <p className="text-sm text-muted/80">いいねしたアルバムはまだありません</p>

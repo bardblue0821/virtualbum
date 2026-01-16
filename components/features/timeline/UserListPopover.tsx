@@ -2,6 +2,7 @@
 import React from "react";
 import Image from "next/image";
 import { getOptimizedImageUrl } from "@/lib/utils/imageUrl";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export interface UserListItem {
   uid: string;
@@ -31,7 +32,7 @@ export function UserListPopover({
     <div className="absolute left-0 top-full mt-1 w-64 rounded border border-line bg-background shadow-lg z-40">
       <div className="p-2">
         <p className="text-[11px] text-muted/80 mb-1">{title}</p>
-        {loading && <p className="text-xs text-muted/80">読み込み中...</p>}
+        {loading && <LoadingSpinner size="xs" />}
         {!loading && (
           users.length > 0 ? (
             <ul className="max-h-64 overflow-auto divide-y divide-line">
