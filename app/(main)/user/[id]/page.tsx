@@ -27,7 +27,7 @@ import GalleryGrid from '@/components/gallery/GalleryGrid';
 import { Button } from '@/components/ui/Button';
 
 // Shared components
-import UserListModal, { type UserListItem } from '@/app/_shared/components/UserListModal';
+import UserListModal, { type UserListItem } from '@/app/(main)/user/[id]/_components/UserListModal';
 
 export default function ProfilePage() {
   const params = useParams();

@@ -20,9 +20,7 @@ interface UserListModalProps {
   emptyMessage?: string;
 }
 
-/**
- * Watchers/Friends 共通のユーザー一覧モーダル
- */
+/*Watchers/Friends 共通のユーザー一覧モーダル*/
 export default function UserListModal({
   open,
   onClose,
