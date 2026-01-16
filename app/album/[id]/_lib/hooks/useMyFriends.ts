@@ -1,6 +1,4 @@
-/**
- * ログインユーザーのフレンドIDを取得するフック
- */
+/*ログインユーザーのフレンドIDを取得するフック*/
 
 import { useState, useEffect } from 'react';
 import { listAcceptedFriends } from '@/lib/repos/friendRepo';

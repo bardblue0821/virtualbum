@@ -1,13 +1,11 @@
-/**
- * アルバム参加者一覧セクション
- */
+/* アルバム参加者一覧セクション */
 
 import React, { useMemo } from 'react';
 import Avatar from '@/components/profile/Avatar';
-import type { ImageData, UploaderInfo } from '../_lib/types/album.types';
+import type { ImageRecord, UploaderInfo } from '../_lib/types/album.types';
 
 interface ParticipantsSectionProps {
-  images: ImageData[];
+  images: ImageRecord[];
   uploaderMap: Record<string, UploaderInfo>;
   albumOwnerId: string;
   myFriendIds: Set<string>;
@@ -57,7 +55,7 @@ export function ParticipantsSection({
           const isMyFriend = myFriendIds.has(uid as string);
 
           // 枠の色: フレンドならオレンジ枠、それ以外は枠なし
-          const borderClass = isMyFriend ? 'border-3 border-friend' : '';
+          const borderClass = isMyFriend ? 'border-1 border-friend' : '';
 
           return (
             <a
@@ -66,7 +64,6 @@ export function ParticipantsSection({
               aria-label="プロフィールへ"
               className="shrink-0 relative"
             >
-              {/* 王冠マーク（オーナーのみ） */}
               {isAlbumOwner && (
                 <span
                   className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 text-yellow-500 drop-shadow-sm"

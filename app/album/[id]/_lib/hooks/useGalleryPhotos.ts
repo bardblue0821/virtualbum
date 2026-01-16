@@ -1,13 +1,12 @@
-/**
- * ギャラリー表示用の写真データを生成するフック
- */
+/*ギャラリー表示用の写真データを生成するフック*/
 
 import { useMemo } from 'react';
 import { type PhotoItem } from '@/components/gallery/GalleryGrid';
-import type { ImageData, UploaderInfo } from '../types/album.types';
+import { GALLERY_DIMENSIONS } from '../constants/album.constants';
+import type { ImageRecord, UploaderInfo } from '../types/album.types';
 
 export function useGalleryPhotos(
-  images: ImageData[],
+  images: ImageRecord[],
   uploaderMap: Record<string, UploaderInfo>
 ): PhotoItem[] {
   return useMemo(() => {
@@ -15,8 +14,8 @@ export function useGalleryPhotos(
       id: img.id,
       src: img.url,
       thumbSrc: img.thumbUrl || img.url,
-      width: 1200,
-      height: 1200,
+      width: GALLERY_DIMENSIONS.WIDTH,
+      height: GALLERY_DIMENSIONS.HEIGHT,
       alt: img.id || 'image',
       uploaderId: img.uploaderId,
       uploaderIconURL: img.uploaderId

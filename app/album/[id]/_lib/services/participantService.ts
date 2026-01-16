@@ -1,9 +1,9 @@
-import type { ImageData, ParticipantInfo, UploaderInfo } from '../types/album.types';
+import type { ImageRecord, ParticipantInfo, UploaderInfo } from '../types/album.types';
 import { IMAGE_LIMITS } from '../constants/album.constants';
 
 /*画像データと uploaderMap から参加者情報を集計してソートする*/
 export function processParticipants(
-  images: ImageData[],
+  images: ImageRecord[],
   uploaderMap: Record<string, UploaderInfo>
 ): ParticipantInfo[] {
   const userImageCounts = new Map<string, number>();
@@ -25,7 +25,7 @@ export function processParticipants(
 
 /*ユーザーごとの画像枚数制限チェック*/
 export function checkImageLimitPerUser(
-  images: ImageData[],
+  images: ImageRecord[],
   currentUserId: string
 ): {
   canUpload: boolean;

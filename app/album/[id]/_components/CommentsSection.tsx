@@ -1,6 +1,6 @@
 import React from "react";
-import { CommentList } from "../comments/CommentList";
-import { CommentForm } from "../comments/CommentForm";
+import { CommentList } from "@/components/comments/CommentList";
+import { CommentForm } from "@/components/comments/CommentForm";
 
 export interface CommentRecord { id: string; body: string; userId: string; createdAt?: any; [key: string]: any; }
 

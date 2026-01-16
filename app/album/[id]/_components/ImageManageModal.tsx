@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Button } from "../ui/Button";
-import { useToast } from "../ui/Toast";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuthUser } from "@/src/hooks/useAuthUser";
-import AlbumImageCropper from "../upload/AlbumImageCropper";
+import AlbumImageCropper from "@/components/upload/AlbumImageCropper";
 import { getCroppedBlobSized } from "@/src/services/avatar";
-import DeleteConfirmModal from "./DeleteConfirmModal";
+import DeleteConfirmModal from "@/components/album/DeleteConfirmModal";
 
 const MAX_IMAGES_PER_USER = 4;
 

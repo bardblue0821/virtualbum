@@ -1,34 +1,49 @@
-/**
- * 画像管理モーダルと削除処理を統合するフック
- */
+/*画像管理モーダルと削除処理を統合するフック*/
 
 import { useState } from 'react';
 import { listImages } from '@/lib/repos/imageRepo';
-import type { ImageData } from '../types/album.types';
+import type { ImageRecord } from '../types/album.types';
+
+// タイムスタンプを数値に変換
+function getTimestampMillis(ts: unknown): number {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (ts instanceof Date) return ts.getTime();
+  if (typeof ts === 'object' && 'seconds' in ts) {
+    const obj = ts as { seconds?: number };
+    return (obj.seconds ?? 0) * 1000;
+  }
+  return 0;
+}
 
 export function useImageManagement(
   albumId: string | undefined,
   userId: string | undefined,
-  images: ImageData[],
-  setImages: React.Dispatch<React.SetStateAction<any[]>>
+  images: ImageRecord[],
+  setImages: React.Dispatch<React.SetStateAction<ImageRecord[]>>,
+  getIdToken?: () => Promise<string>
 ) {
   const [imageManageModalOpen, setImageManageModalOpen] = useState(false);
 
   const handleImageUploaded = async () => {
     if (!albumId) return;
     const imgs = await listImages(albumId);
-    imgs.sort(
-      (a: any, b: any) =>
-        (b.createdAt?.seconds || b.createdAt || 0) -
-        (a.createdAt?.seconds || a.createdAt || 0)
-    );
-    setImages(imgs as any);
+    imgs.sort((a: unknown, b: unknown) => {
+      const aTime = getTimestampMillis((a as ImageRecord).createdAt);
+      const bTime = getTimestampMillis((b as ImageRecord).createdAt);
+      return bTime - aTime;
+    });
+    setImages(imgs as ImageRecord[]);
   };
 
   const handleDeleteImage = async (imageId: string) => {
     if (!albumId || !userId) return;
-    
-    const token = await (window as any).__getIdToken?.();
+
+    if (!getIdToken) {
+      throw new Error('Authentication function not provided');
+    }
+
+    const token = await getIdToken();
     if (!token) throw new Error('Not authenticated');
 
     const res = await fetch('/api/images/delete', {
@@ -41,8 +56,8 @@ export function useImageManagement(
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.error || 'DELETE_FAILED');
+      const data = await res.json().catch(() => ({})) as { error?: unknown };
+      throw new Error(data?.error instanceof Error ? data.error.message : String(data?.error || 'DELETE_FAILED'));
     }
 
     setImages((prev) => prev.filter((img) => img.id !== imageId));

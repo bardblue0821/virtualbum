@@ -1,12 +1,13 @@
 "use client";
-import React, { useEffect } from "react";
+import React from "react";
 import { useParams, useRouter } from "next/navigation";
-import AlbumHeader from "@/components/album/AlbumHeader";
-import ReactionsBar from "@/components/album/ReactionsBar";
-import GallerySection from "@/components/album/GallerySection";
-import CommentsSection from "@/components/album/CommentsSection";
+import AlbumHeader from "./_components/AlbumHeader";
+import ReactionsBar from "./_components/ReactionsBar";
+import GallerySection from "./_components/GallerySection";
+import CommentsSection from "./_components/CommentsSection";
 import DeleteConfirmModal from "@/components/album/DeleteConfirmModal";
-import ImageManageModal from "@/components/album/ImageManageModal";
+import ImageManageModal from "./_components/ImageManageModal";
+import { Button } from "@/components/ui/Button";
 import { useAuthUser } from "@/src/hooks/useAuthUser";
 import { useToast } from "@/components/ui/Toast";
 import { useThumbBackfill } from "@/src/hooks/useThumbBackfill";
@@ -15,22 +16,20 @@ import { AlbumPermissionGuard } from "./_components/AlbumPermissionGuard";
 import { ParticipantsSection } from "./_components/ParticipantsSection";
 import { IMAGE_LIMITS, MODAL_MESSAGES } from "./_lib/constants/album.constants";
 import {
+  useAlbumData,
+  useAlbumEdit,
   useAlbumPermissions,
-  useMyFriends,
   useAlbumTags,
-  useGalleryPhotos,
+  useComments,
   useGalleryPermissions,
+  useGalleryPhotos,
+  useImageActions,
   useImageManagement,
+  useLikes,
+  useMyFriends,
+  useReactions,
   useVisibleCount,
 } from "./_lib/hooks";
-import {
-  useAlbumData,
-  useLikes,
-  useReactions,
-  useComments,
-  useAlbumEdit,
-  useImageActions,
-} from "./hooks";
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -38,15 +37,6 @@ export default function AlbumDetailPage() {
   const { user } = useAuthUser();
   const router = useRouter();
   const toast = useToast();
-
-  useEffect(() => {
-    if (user) {
-      (window as any).__getIdToken = () => user.getIdToken();
-    }
-    return () => {
-      delete (window as any).__getIdToken;
-    };
-  }, [user]);
 
   const {
     album,
@@ -65,7 +55,12 @@ export default function AlbumDetailPage() {
   const { isOwner, isFriend, isWatcher, isPrivate, isBlocked, canAddImages, canPostComment } =
     useAlbumPermissions(album, user?.uid);
 
-  const { likeCount, liked, likeBusy, handleToggleLike } = useLikes(albumId, user?.uid, setError);
+  const { likeCount, liked, likeBusy, handleToggleLike } = useLikes(
+    albumId,
+    user?.uid,
+    setError,
+    user?.getIdToken
+  );
 
   const {
     pickerOpen,
@@ -86,7 +81,6 @@ export default function AlbumDetailPage() {
     onChipLeave,
   } = useReactions(albumId, user?.uid, album, reactions, setReactions, setError, toast);
 
-  // コメント
   const {
     editingCommentId,
     editingCommentBody,
@@ -101,7 +95,6 @@ export default function AlbumDetailPage() {
     submitComment,
   } = useComments(albumId, user?.uid, comments, isOwner, isFriend, isWatcher, isPrivate, setError, toast);
 
-  // アルバム編集
   const {
     editTitle,
     editPlaceUrl,
@@ -119,7 +112,6 @@ export default function AlbumDetailPage() {
     setShowDeleteConfirm,
   } = useAlbumEdit(albumId, album, setAlbum, setError, toast, router);
 
-  // 画像操作
   const {
     showDeleteImageConfirm,
     deletingImage,
@@ -143,26 +135,18 @@ export default function AlbumDetailPage() {
     existingImages,
     handleImageUploaded,
     handleDeleteImage,
-  } = useImageManagement(albumId, user?.uid, images, setImages);
+  } = useImageManagement(albumId, user?.uid, images, setImages, user?.getIdToken);
 
   useThumbBackfill(albumId, images, visibleCount, setImages);
 
-  useEffect(() => {
-    if (album) {
-      setEditTitle(album.title ?? "");
-      setEditPlaceUrl(album.placeUrl ?? "");
-    }
-  }, [album, setEditTitle, setEditPlaceUrl]);
-
-  const myCount = images.filter((img) => img.uploaderId === user?.uid).length;
-  const remaining = IMAGE_LIMITS.PER_USER - myCount;
+  const userUploadedCount = images.filter((img) => img.uploaderId === user?.uid).length;
+  const remainingUploadSlots = IMAGE_LIMITS.PER_USER - userUploadedCount;
 
   return (
     <AlbumPermissionGuard
       albumId={albumId}
       loading={loading}
       album={album}
-      error={error}
       isBlocked={isBlocked}
       isOwner={isOwner}
     >
@@ -204,7 +188,7 @@ export default function AlbumDetailPage() {
         reactorMap={reactorMap}
         reactorLoading={reactorLoading}
         pickerOpen={pickerOpen}
-        onTogglePicker={() => setPickerOpen((o) => !o)}
+        onTogglePicker={() => setPickerOpen(!pickerOpen)}
         emojiQuery={emojiQuery}
         onEmojiQueryChange={setEmojiQuery}
         activeCat={activeCat}
@@ -223,7 +207,7 @@ export default function AlbumDetailPage() {
         canDelete={canDelete}
         onDelete={(p) => p.id && askDeleteImage(p.id)}
         showUploader={canAddImages}
-        remaining={remaining}
+        remaining={remainingUploadSlots}
         onOpenManageModal={() => setImageManageModalOpen(true)}
       />
 
@@ -247,12 +231,10 @@ export default function AlbumDetailPage() {
 
       {isOwner && (
         <section>
-          <div className="pt-3 mt-2">
-            <button
-              type="button"
-              onClick={askDeleteAlbum}
-              className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
-            >アルバムを削除</button>
+          <div className="mt-2">
+            <Button variant="danger" size="sm" onClick={askDeleteAlbum}>
+              アルバム削除
+            </Button>
           </div>
         </section>
       )}
@@ -284,7 +266,6 @@ export default function AlbumDetailPage() {
         description={MODAL_MESSAGES.DELETE_LAST_IMAGE.description}
       />
 
-      {/* 画像管理モーダル */}
       <ImageManageModal
         open={imageManageModalOpen}
         onClose={() => setImageManageModalOpen(false)}

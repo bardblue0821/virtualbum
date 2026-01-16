@@ -9,14 +9,15 @@ export interface AlbumData {
   updatedAt?: any;
 }
 
-export interface ImageData {
+export type ImageRecord = {
   id: string;
   albumId: string;
   uploaderId: string;
   url: string;
-  thumbUrl?: string | null;
+  thumbUrl?: string;
   createdAt?: any;
-}
+  [key: string]: any;
+};
 
 export interface CommentData {
   id: string;

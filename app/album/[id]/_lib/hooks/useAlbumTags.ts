@@ -1,6 +1,4 @@
-/**
- * アルバムタグの管理フック
- */
+/*アルバムタグの管理フック*/
 
 import { useState, useEffect } from 'react';
 import { getAllAlbumTags, updateAlbumTags } from '@/lib/repos/tagRepo';

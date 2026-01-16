@@ -1,8 +1,7 @@
-/**
- * アルバムのアクセス権限チェックコンポーネント
- */
-
+"use client";
 import React from 'react';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { NotFoundPage } from '@/components/ui/NotFoundPage';
 import { ERROR_MESSAGES } from '../_lib/constants/album.constants';
 
 interface AlbumPermissionGuardProps<T> {
@@ -10,7 +9,6 @@ interface AlbumPermissionGuardProps<T> {
   albumId: string | undefined;
   loading: boolean;
   album: T | null;
-  error: string | null;
   isBlocked: boolean;
   isOwner: boolean;
 }
@@ -20,21 +18,17 @@ export function AlbumPermissionGuard<T>({
   albumId,
   loading,
   album,
-  error,
   isBlocked,
   isOwner,
 }: AlbumPermissionGuardProps<T>) {
-  // アルバムIDが指定されていない
   if (!albumId) {
     return <div className="text-sm fg-subtle">{ERROR_MESSAGES.NO_ALBUM_ID}</div>;
   }
 
-  // 読み込み中
   if (loading) {
-    return <div className="text-sm fg-subtle">読み込み中...</div>;
+    return <LoadingSpinner size="sm" />;
   }
 
-  // ブロック判定: オーナーにブロックされている or オーナーをブロックしている場合は表示しない
   if (isBlocked && !isOwner) {
     return (
       <div className="text-sm fg-muted p-8 text-center">
@@ -44,15 +38,15 @@ export function AlbumPermissionGuard<T>({
     );
   }
 
-  // アルバムが存在しない
   if (!album) {
     return (
-      <div className="text-sm fg-muted">
-        {error ?? ERROR_MESSAGES.ALBUM_NOT_FOUND}
-      </div>
+      <NotFoundPage
+        title={ERROR_MESSAGES.ALBUM_NOT_FOUND}
+        description={ERROR_MESSAGES.ALBUM_NOT_FOUND_DESC}
+      />
     );
   }
 
-  // すべてのチェックをパス - 関数として children を呼び出し、album を渡す
+  // すべてのチェックをパス
   return <>{children(album)}</>;
 }

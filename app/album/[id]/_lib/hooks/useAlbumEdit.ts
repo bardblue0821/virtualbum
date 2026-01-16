@@ -1,3 +1,13 @@
+/*
+1. 編集状態管理	タイトル、場所URL の入力値を管理
+2. 保存操作	handleSaveAlbum() で全フィールド一括保存
+3. 個別保存	saveTitleIfChanged(), savePlaceUrlIfChanged() でBlur時保存
+4. 公開設定変更	handleChangeVisibility() で可視性切り替え + リポスト削除
+5. 削除操作	アルバム削除の確認・実行
+6. UI ステート	ローディング、削除確認モーダルの状態管理
+7. キーボード操作	Enter キーでBlur（フォーカス外れ）
+*/
+
 "use client";
 import { useState, useCallback } from "react";
 import { translateError } from "@/lib/errors";
@@ -30,8 +40,8 @@ export function useAlbumEdit(
   toast: { success: (msg: string) => void },
   router: { replace: (url: string) => void }
 ): UseAlbumEditResult {
-  const [editTitle, setEditTitle] = useState(album?.title ?? "");
-  const [editPlaceUrl, setEditPlaceUrl] = useState(album?.placeUrl ?? "");
+  const [editTitle, setEditTitle] = useState(() => album?.title ?? "");
+  const [editPlaceUrl, setEditPlaceUrl] = useState(() => album?.placeUrl ?? "");
   const [savingAlbum, setSavingAlbum] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -45,8 +55,9 @@ export function useAlbumEdit(
       toast.success("保存しました");
       const updated = await getAlbumSafe(albumId);
       if (updated) setAlbum(updated as AlbumRecord);
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setSavingAlbum(false);
     }
@@ -72,8 +83,9 @@ export function useAlbumEdit(
       const updated = await getAlbumSafe(albumId);
       if (updated) setAlbum(updated as AlbumRecord);
       toast.success("保存しました");
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setSavingAlbum(false);
     }
@@ -91,8 +103,9 @@ export function useAlbumEdit(
       await updateAlbum(albumId, { title: next });
       setAlbum((prev) => (prev ? { ...prev, title: next } : prev));
       toast.success("保存しました");
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setSavingAlbum(false);
     }
@@ -110,8 +123,9 @@ export function useAlbumEdit(
       await updateAlbum(albumId, { placeUrl: next });
       setAlbum((prev) => (prev ? { ...prev, placeUrl: next } : prev));
       toast.success("保存しました");
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setSavingAlbum(false);
     }
@@ -141,8 +155,9 @@ export function useAlbumEdit(
         );
       } catch {}
       router.replace('/timeline');
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);

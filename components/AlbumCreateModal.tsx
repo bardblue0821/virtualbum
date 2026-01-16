@@ -51,7 +51,6 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       previewsRef.current.forEach((p) => URL.revokeObjectURL(p.url));
       croppedPreviewsRef.current.forEach((p) => p && URL.revokeObjectURL(p.url));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -99,7 +98,6 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     const fileList = e.target.files;
     if (!fileList) return;
     addFiles(fileList);
-    // inputをリセット（同じファイルを再選択可能に）
     e.target.value = '';
   }
 
@@ -164,9 +162,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
 
     setCropping(true);
     try {
-      // 最小要件: 正方形(1:1) / 長方形(4:3)
       const output = aspect === 'square' ? { width: 1024, height: 1024 } : { width: 1280, height: 960 };
-      // 再編集でも必ず元画像から切り抜けるよう、cropSrc（元File由来）を優先
       const blob = await getCroppedBlobSized(cropSrc ?? p.url, area, output, 'image/jpeg', 0.9);
       const nextFile = new File([blob], p.file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
       const nextUrl = URL.createObjectURL(nextFile);

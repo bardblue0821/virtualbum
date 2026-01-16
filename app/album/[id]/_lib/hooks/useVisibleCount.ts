@@ -1,6 +1,4 @@
-/**
- * 画像表示件数の管理フック
- */
+/*画像表示件数の管理フック*/
 
 import { useState, useCallback } from 'react';
 import { IMAGE_LIMITS } from '../constants/album.constants';

@@ -4,6 +4,11 @@ export const IMAGE_LIMITS = {
   LOAD_MORE_COUNT: 16,
 };
 
+export const GALLERY_DIMENSIONS = {
+  WIDTH: 600,
+  HEIGHT: 600,
+} as const;
+
 export const MODAL_MESSAGES = {
   DELETE_IMAGE: {
     title: 'この画像を削除しますか？',
@@ -18,6 +23,7 @@ export const MODAL_MESSAGES = {
 export const ERROR_MESSAGES = {
   NO_ALBUM_ID: 'アルバムIDが指定されていません。',
   ALBUM_NOT_FOUND: 'アルバムが見つかりません',
+  ALBUM_NOT_FOUND_DESC: 'お探しのアルバムは存在しないか、削除されている可能性があります。',
   CANNOT_VIEW_ALBUM: 'このアルバムは表示できません',
   DELETE_FAILED: '削除に失敗しました',
 } as const;

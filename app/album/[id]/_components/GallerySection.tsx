@@ -2,7 +2,7 @@
 
 import React, { useRef, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { type PhotoItem } from "../gallery/GalleryGrid";
+import { type PhotoItem } from "@/components/gallery/GalleryGrid";
 
 // lightGallery はクライアント側のみで読み込む
 const LightGallery = dynamic(() => import("lightgallery/react"), { ssr: false });

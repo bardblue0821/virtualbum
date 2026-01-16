@@ -1,11 +1,27 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect} from "react";
 import { translateError } from "@/lib/errors";
 import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
 import { subscribeComments } from "@/lib/repos/commentRepo";
 import { batchGetUsers } from "@/lib/utils/batchQuery";
 import { getMutedUserIds } from "@/lib/repos/muteRepo";
 import type { UserRef } from "@/src/models/album";
+import type { ImageRecord } from "../types/album.types";
+
+type FirestoreTimestamp = {
+  seconds?: number;
+  nanoseconds?: number;
+} | Date | number | null | undefined;
+
+function getTimestampMillis(ts: FirestoreTimestamp): number {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (ts instanceof Date) return ts.getTime();
+  if (typeof ts === 'object' && 'seconds' in ts) {
+    return (ts.seconds ?? 0) * 1000;
+  }
+  return 0;
+}
 
 export type AlbumRecord = {
   id: string;
@@ -20,17 +36,7 @@ export type CommentRecord = {
   id: string;
   body: string;
   userId: string;
-  createdAt?: any;
-  [key: string]: any;
-};
-
-export type ImageRecord = {
-  id: string;
-  albumId: string;
-  uploaderId: string;
-  url: string;
-  thumbUrl?: string;
-  createdAt?: any;
+  createdAt?: FirestoreTimestamp;
   [key: string]: any;
 };
 
@@ -123,22 +129,22 @@ export function useAlbumData(
         // コメントのリアルタイム購読
         unsubComments = await subscribeComments(
           albumId,
-          (snapshotList) => {
+          (snapshotList: unknown[]) => {
             if (cancelled) return;
-            const list = [...snapshotList]
-              .filter((c) => !mutedSet.has(c.userId)) // ミュートユーザーのコメントを除外
-              .sort(
-                (a, b) =>
-                  (a.createdAt?.seconds || a.createdAt || 0) -
-                  (b.createdAt?.seconds || b.createdAt || 0),
-              );
+            const list = snapshotList
+              .filter((c: any) => !mutedSet.has(c.userId))
+              .sort((a: any, b: any) => getTimestampMillis(a.createdAt) - getTimestampMillis(b.createdAt));
             setComments(list as CommentRecord[]);
           },
-          (err) => console.warn("comments subscribe error", err),
+          (err: unknown) => {
+            const error = err instanceof Error ? err : new Error(String(err));
+            console.warn("comments subscribe error", error);
+          },
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(translateError(e));
+          const error = e instanceof Error ? e : new Error(String(e));
+          setError(translateError(error));
         }
       } finally {
         if (!cancelled) {

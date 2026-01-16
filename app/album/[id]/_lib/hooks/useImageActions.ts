@@ -1,9 +1,31 @@
-"use client";
+/*
+1. 画像アップロード	handleAddImage() - ファイル選択 → API送信 → リスト更新
+2. 画像削除確認	askDeleteImage() - 削除ダイアログ表示
+3. 画像削除実行	confirmDeleteImage() - API削除 → リスト更新
+4. 最後の画像削除	confirmDeleteLastImageWithAlbum() - 最後の画像の場合はアルバムも削除
+5. キャンセル処理	cancelDeleteLastImage() - モーダルクローズ
+6. UI ステート管理	ローディング、モーダル表示/非表示の状態
+7. 権限チェック	アップロード・削除時に権限検証
+*/
+
+"use client"
 import { useState, useCallback } from "react";
 import { translateError } from "@/lib/errors";
 import { listImages } from "@/lib/repos/imageRepo";
 import { deleteAlbum } from "@/lib/repos/albumRepo";
-import type { ImageRecord, AlbumRecord } from "./useAlbumData";
+import type { ImageRecord } from "../types/album.types";
+
+// タイムスタンプを数値に変換
+function getTimestampMillis(ts: unknown): number {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (ts instanceof Date) return ts.getTime();
+  if (typeof ts === 'object' && 'seconds' in ts) {
+    const obj = ts as { seconds?: number };
+    return (obj.seconds ?? 0) * 1000;
+  }
+  return 0;
+}
 
 export interface UseImageActionsResult {
   file: File | null;
@@ -30,6 +52,12 @@ async function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("FILE_READ_ERROR"));
     reader.readAsDataURL(file);
   });
+}
+
+// window.__getIdToken 関数を取得（型安全）
+function getIdTokenFn(): (() => Promise<string>) | undefined {
+  const win = window as { __getIdToken?: () => Promise<string> };
+  return win.__getIdToken;
 }
 
 export function useImageActions(
@@ -65,7 +93,8 @@ export function useImageActions(
     
     try {
       const url = await fileToDataUrl(file);
-      const token = await (window as any).__getIdToken?.();
+      const idTokenFn = getIdTokenFn();
+      const token = idTokenFn ? await idTokenFn() : undefined;
       
       console.log('[album:addImage] uploading image');
       const res = await fetch('/api/images/add', {
@@ -78,7 +107,7 @@ export function useImageActions(
       });
       
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: unknown };
         console.error('[album:addImage] API error:', data);
         setError(translateError(data?.error || 'UNKNOWN'));
         return;
@@ -89,30 +118,32 @@ export function useImageActions(
       try {
         const imgs = await listImages(albumId);
         console.log('[album:addImage] image list refreshed', imgs.length);
-        imgs.sort(
-          (a: any, b: any) =>
-            (b.createdAt?.seconds || b.createdAt || 0) -
-            (a.createdAt?.seconds || a.createdAt || 0),
-        );
+        imgs.sort((a: unknown, b: unknown) => {
+          const aTime = getTimestampMillis((a as ImageRecord).createdAt);
+          const bTime = getTimestampMillis((b as ImageRecord).createdAt);
+          return bTime - aTime;
+        });
         setImages(imgs as ImageRecord[]);
         setFile(null);
         console.log('[album:addImage] complete');
-      } catch (listError: any) {
-        console.warn('[album:addImage] failed to refresh image list, but upload succeeded:', listError);
+      } catch (listError: unknown) {
+        const error = listError instanceof Error ? listError : new Error(String(listError));
+        console.warn('[album:addImage] failed to refresh image list, but upload succeeded:', error);
         // 楽観的更新
-        const newImage = {
+        const newImage: ImageRecord = {
           id: Date.now().toString(),
           albumId,
           uploaderId: userId,
           url,
           createdAt: new Date(),
         };
-        setImages((prev) => [newImage as ImageRecord, ...prev]);
+        setImages((prev) => [newImage, ...prev]);
         setFile(null);
       }
-    } catch (e: any) {
-      console.error('[album:addImage] error:', e);
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      console.error('[album:addImage] error:', error);
+      setError(translateError(error));
     } finally {
       setUploading(false);
     }
@@ -142,7 +173,8 @@ export function useImageActions(
         return;
       }
       
-      const token = await (window as any).__getIdToken?.();
+      const idTokenFn = getIdTokenFn();
+      const token = idTokenFn ? await idTokenFn() : undefined;
       const res = await fetch('/api/images/delete', {
         method: 'POST',
         headers: { 
@@ -153,22 +185,23 @@ export function useImageActions(
       });
       
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: unknown };
         setError(translateError(data?.error || 'UNKNOWN'));
         return;
       }
       
       const imgs = await listImages(albumId!);
-      imgs.sort(
-        (a: any, b: any) =>
-          (b.createdAt?.seconds || b.createdAt || 0) -
-          (a.createdAt?.seconds || a.createdAt || 0),
-      );
+      imgs.sort((a: unknown, b: unknown) => {
+        const aTime = getTimestampMillis((a as ImageRecord).createdAt);
+        const bTime = getTimestampMillis((b as ImageRecord).createdAt);
+        return bTime - aTime;
+      });
       setImages(imgs as ImageRecord[]);
       setShowDeleteImageConfirm(false);
       setDeletingImageId(null);
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setDeletingImage(false);
     }
@@ -187,8 +220,9 @@ export function useImageActions(
         );
       } catch {}
       router.replace('/timeline');
-    } catch (e: any) {
-      setError(translateError(e));
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setDeleting(false);
       setShowDeleteLastImageModal(false);

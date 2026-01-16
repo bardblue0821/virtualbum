@@ -1,17 +1,15 @@
-/**
- * 画像操作のサービス層
- */
+/*画像操作のサービス層*/
 
-import type { ImageData } from '../types/album.types';
+import type { ImageRecord } from '../types/album.types';
 
-export function sortImagesByTimestamp(images: ImageData[]): ImageData[] {
+export function sortImagesByTimestamp(images: ImageRecord[]): ImageRecord[] {
   return [...images].sort((a, b) => {
     if (!a.createdAt || !b.createdAt) return 0;
     return a.createdAt.seconds - b.createdAt.seconds;
   });
 }
 
-export function filterImagesByUser(images: ImageData[], userId: string): ImageData[] {
+export function filterImagesByUser(images: ImageRecord[], userId: string): ImageRecord[] {
   return images.filter((img) => img.uploaderId === userId);
 }
 

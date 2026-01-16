@@ -1,8 +1,8 @@
 import React from "react";
 import ReactorPopover from "./ReactorPopover";
 import ReactionPicker, { ReactionCategory } from "./ReactionPicker";
-import { HeartIcon } from "../icons/HeartIcon";
-import type { Reactor } from "../../lib/repos/reactionRepo";
+import { HeartIcon } from "@/components/icons/HeartIcon";
+import type { Reactor } from "@/lib/repos/reactionRepo";
 
 export interface ReactionsBarProps {
   liked: boolean;

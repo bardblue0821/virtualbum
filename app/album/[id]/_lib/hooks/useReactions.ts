@@ -11,9 +11,9 @@ export interface UseReactionsResult {
   reactions: ReactionItem[];
   setReactions: React.Dispatch<React.SetStateAction<ReactionItem[]>>;
   pickerOpen: boolean;
-  setPickerOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setPickerOpen: (open: boolean) => void;
   emojiQuery: string;
-  setEmojiQuery: React.Dispatch<React.SetStateAction<string>>;
+  setEmojiQuery: (query: string) => void;
   activeCat: ReactionCategoryKey;
   setActiveCat: React.Dispatch<React.SetStateAction<ReactionCategoryKey>>;
   filteredEmojis: string[];
@@ -37,8 +37,7 @@ export function useReactions(
   setError: (error: string | null) => void,
   toast: { error: (msg: string) => void }
 ): UseReactionsResult {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [emojiQuery, setEmojiQuery] = useState("");
+  const [pickerState, setPickerState] = useState<{ open: boolean; query: string }>({ open: false, query: "" });
   const [activeCat, setActiveCat] = useState<ReactionCategoryKey>(REACTION_CATEGORIES[0]?.key || 'faces');
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
@@ -47,26 +46,26 @@ export function useReactions(
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const pickerBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const filteredEmojis = useMemo(() => filterReactionEmojis(emojiQuery), [emojiQuery]);
+  const filteredEmojis = useMemo(() => filterReactionEmojis(pickerState.query), [pickerState.query]);
   const categoryEmojis = useMemo(() => {
     const cat = REACTION_CATEGORIES.find(c => c.key === activeCat);
     return cat ? cat.emojis : [];
   }, [activeCat]);
 
-  // ピッカー外クリック/ESCで閉じる
+  // ピッカー外クリック/ESC/状態変更時の処理
   useEffect(() => {
-    if (!pickerOpen) return;
+    if (!pickerState.open) return;
     
     function onMouseDown(e: MouseEvent) {
       const t = e.target as Node;
       if (pickerRef.current && !pickerRef.current.contains(t) && 
           pickerBtnRef.current && !pickerBtnRef.current.contains(t)) {
-        setPickerOpen(false);
+        setPickerState({ open: false, query: "" });
       }
     }
     
     function onKey(e: KeyboardEvent) { 
-      if (e.key === 'Escape') setPickerOpen(false); 
+      if (e.key === 'Escape') setPickerState({ open: false, query: "" }); 
     }
     
     window.addEventListener('mousedown', onMouseDown);
@@ -76,12 +75,7 @@ export function useReactions(
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [pickerOpen]);
-
-  // 開くたびに検索語をクリア
-  useEffect(() => { 
-    if (pickerOpen) setEmojiQuery(""); 
-  }, [pickerOpen]);
+  }, [pickerState.open]);
 
   const handleToggleReaction = useCallback(async (emoji: string) => {
     if (!userId || !albumId) return;
@@ -170,10 +164,10 @@ export function useReactions(
   return {
     reactions,
     setReactions,
-    pickerOpen,
-    setPickerOpen,
-    emojiQuery,
-    setEmojiQuery,
+    pickerOpen: pickerState.open,
+    setPickerOpen: (open: boolean) => setPickerState({ open, query: open ? "" : pickerState.query }),
+    emojiQuery: pickerState.query,
+    setEmojiQuery: (query: string) => setPickerState({ ...pickerState, query }),
     activeCat,
     setActiveCat,
     filteredEmojis,

@@ -1,6 +1,4 @@
-/**
- * ギャラリーの削除権限チェック
- */
+/*ギャラリーの削除権限チェック*/
 
 import { useCallback } from 'react';
 import { type PhotoItem } from '@/components/gallery/GalleryGrid';

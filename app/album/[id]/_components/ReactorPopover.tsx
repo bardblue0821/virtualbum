@@ -1,5 +1,5 @@
 import React from "react";
-import type { Reactor } from "../../lib/repos/reactionRepo";
+import type { Reactor } from "@/lib/repos/reactionRepo";
 
 export interface ReactorPopoverProps {
   emoji: string;

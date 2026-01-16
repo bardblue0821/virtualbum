@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { translateError } from "@/lib/errors";
 import { toggleLike, hasLiked, countLikes, subscribeLikes } from "@/lib/repos/likeRepo";
 
@@ -13,31 +13,36 @@ export interface UseLikesResult {
 export function useLikes(
   albumId: string | undefined,
   userId: string | undefined,
-  setError: (error: string | null) => void
+  setError: (error: string | null) => void,
+  getIdToken?: () => Promise<string>
 ): UseLikesResult {
   const [likeCount, setLikeCount] = useState(0);
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     if (!albumId) return;
 
-    let cancelled = false;
+    cancelledRef.current = false;
     let unsubLikes: (() => void) | undefined;
 
     (async () => {
       try {
         // 初期値はクエリで即時反映
         const cnt = await countLikes(albumId);
-        if (!cancelled) setLikeCount(cnt);
+        if (!cancelledRef.current) setLikeCount(cnt);
         if (userId) {
           const likedFlag = await hasLiked(albumId, userId);
-          if (!cancelled) setLiked(likedFlag);
+          if (!cancelledRef.current) setLiked(likedFlag);
         } else {
-          if (!cancelled) setLiked(false);
+          if (!cancelledRef.current) setLiked(false);
         }
-      } catch (e: any) {
-        if (!cancelled) setError(translateError(e));
+      } catch (e: unknown) {
+        if (!cancelledRef.current) {
+          const error = e instanceof Error ? e : new Error(String(e));
+          setError(translateError(error));
+        }
       }
       
       // リアルタイム購読で常に同期
@@ -47,18 +52,24 @@ export function useLikes(
           (list) => {
             const cnt2 = list.length;
             const meLiked = !!(userId && list.some(x => x.userId === userId));
-            setLikeCount(cnt2);
-            setLiked(meLiked);
+            if (!cancelledRef.current) {
+              setLikeCount(cnt2);
+              setLiked(meLiked);
+            }
           },
-          (err) => console.warn("likes subscribe error", err)
+          (err: unknown) => {
+            const error = err instanceof Error ? err : new Error(String(err));
+            console.warn("likes subscribe error", error);
+          }
         );
-      } catch (e) {
-        console.warn('subscribeLikes failed', e);
+      } catch (e: unknown) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        console.warn('subscribeLikes failed', error);
       }
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       if (unsubLikes) try { unsubLikes(); } catch {}
     };
   }, [albumId, userId, setError]);
@@ -75,7 +86,13 @@ export function useLikes(
     setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
     
     try {
-      const token = await (window as any).__getIdToken?.();
+      let token: string | undefined;
+      if (getIdToken) {
+        token = await getIdToken();
+      } else {
+        token = await (window as any).__getIdToken?.();
+      }
+
       if (token) {
         const res = await fetch('/api/likes/toggle', {
           method: 'POST',
@@ -88,14 +105,15 @@ export function useLikes(
       } else {
         await toggleLike(albumId, userId);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setLiked(prevLiked);
       setLikeCount(prevCount);
-      setError(translateError(e));
+      const error = e instanceof Error ? e : new Error(String(e));
+      setError(translateError(error));
     } finally {
       setLikeBusy(false);
     }
-  }, [albumId, userId, liked, likeCount, setError]);
+  }, [albumId, userId, liked, likeCount, setError, getIdToken]);
 
   return {
     likeCount,
