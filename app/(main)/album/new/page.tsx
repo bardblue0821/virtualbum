@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import AlbumCreateModal from '@/components/features/album/AlbumCreateModal';
+import AlbumCreateModal from '@/components/features/album/create/AlbumCreateModal';
 
 export default function NewAlbumPage() {
   return (

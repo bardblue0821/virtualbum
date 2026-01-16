@@ -1,410 +1,80 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { auth } from '@/lib/firebase';
-import { ensureUser } from '@/lib/authUser';
-import { Button } from '@/components/ui/Button';
-import { isHandleTaken } from '@/lib/db/repositories/user.repository';
-import { getHandleBlockReason, getDisplayNameBlockReason, isHandleBlocked } from '@/lib/constants/userFilters';
-import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
-import { signInWithTwitter, handleTwitterRedirectResult, translateTwitterAuthError } from '@/lib/auth/twitterAuth';
-
-// セキュリティ方針: アカウント存在可否を推測されないため、認証失敗は統一メッセージにまとめる。
-// ただし UI/UX 維持のためフォーマット不正・弱いパスワードなど入力検証系は区別。
-function mapAuthError(code: string): string {
-  switch (code) {
-    // 入力バリデーション系は詳細を返す
-    case 'auth/invalid-email':
-      return 'メールアドレス形式が正しくありません';
-    case 'auth/weak-password':
-      return 'パスワードは6文字以上にしてください';
-    case 'auth/popup-closed-by-user':
-      return 'ポップアップが閉じられました';
-
-    // 存在可否を悟らせる恐れのあるコード群は統一
-    case 'auth/email-already-in-use':
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-login-credentials':
-    case 'auth/invalid-credential':
-    case 'auth/too-many-requests': // レート制限も詳細非表示
-      return '認証に失敗しました';
-    default:
-      return '認証に失敗しました';
-  }
-}
+import React from 'react';
+import { useAuth } from './_lib/hooks';
+import { AuthModeSwitch, AuthForm, SocialLoginButtons } from './_components';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [showPwd, setShowPwd] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [pwdStrength, setPwdStrength] = useState<{score:number; label:string; percent:number; cls:string}>({score:0,label:'',percent:0,cls:''});
-  const [mismatch, setMismatch] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState('');
-  const [handle, setHandle] = useState('');
-  const [handleStatus, setHandleStatus] = useState<'idle'|'checking'|'ok'|'taken'|'invalid'>('idle');
-  const [handleError, setHandleError] = useState<string | null>(null);
-
-  // ログイン画面では、既に検証済みでログイン中ならトップへ。
-  // 未検証でログイン中のケースは基本的に起こさない（登録後は即 signOut）方針。
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u && u.emailVerified) {
-        router.replace('/timeline');
-      }
-    });
-    return () => unsub();
-  }, [router]);
-
-  // Twitter リダイレクト認証の結果を処理
-  useEffect(() => {
-    let mounted = true;
-    
-    async function checkRedirectResult() {
-      try {
-        const result = await handleTwitterRedirectResult();
-        
-        if (result && mounted) {
-          setInfo('X (Twitter) ログイン成功');
-          router.push('/timeline');
-        }
-      } catch (err: any) {
-        if (mounted) {
-          setError(translateTwitterAuthError(err));
-        }
-      }
-    }
-    
-    checkRedirectResult();
-    
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
-
-  function evaluateStrength(pw: string){
-    let score = 0;
-    if (pw.length >= 8) score++;
-    if (pw.length >= 12) score++;
-    if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
-    if (/\d/.test(pw)) score++;
-    if (/[^a-zA-Z0-9]/.test(pw)) score++;
-    // map
-    const levels = [
-      { min:0, label:'弱い', cls:'pw-strength-weak', percent:20 },
-      { min:2, label:'普通', cls:'pw-strength-fair', percent:40 },
-      { min:3, label:'良い', cls:'pw-strength-good', percent:70 },
-      { min:4, label:'強い', cls:'pw-strength-strong', percent:100 }
-    ];
-    let picked = levels[0];
-    for(const l of levels){ if(score >= l.min) picked = l; }
-    return { score, label: pw ? picked.label : '', percent: pw ? picked.percent : 0, cls: pw ? picked.cls : '' };
-  }
-
-  useEffect(()=>{ setPwdStrength(evaluateStrength(password)); }, [password]);
-  useEffect(()=>{ if(mode==='register'){ setMismatch(confirmPassword && password !== confirmPassword ? '確認用パスワードが一致しません' : null); } else { setMismatch(null); } }, [confirmPassword, password, mode]);
-
-  function basicHandleValid(h:string){ return /^[a-z0-9_]{3,20}$/i.test(h); }
-
-  function validate(): boolean {
-    if (!/@.+\./.test(email)) {
-      setError('メールアドレスが不正です');
-      return false;
-    }
-    if (password.length < 6) {
-      setError('パスワードは6文字以上にしてください');
-      return false;
-    }
-    if (mode === 'register') {
-      if (!displayName.trim()) { setError('ユーザー名を入力してください'); return false; }
-      const dnReason = getDisplayNameBlockReason(displayName);
-      if (dnReason) { setError(dnReason); return false; }
-      if (!basicHandleValid(handle)) { setError('ユーザーIDは英数字と_で3〜20文字'); return false; }
-      if (handleStatus === 'taken') { setError('このユーザーIDは既に使用されています'); return false; }
-      const hReason = getHandleBlockReason(handle);
-      if (hReason) { setError(hReason); return false; }
-      if (confirmPassword !== password) {
-        setError('確認用パスワードが一致しません');
-        return false;
-      }
-    }
-    return true;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setInfo(null);
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      if (mode === 'register') {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await ensureUser(cred.user.uid, displayName, cred.user.email, handle);
-        // 確認メール送信
-        await sendEmailVerification(cred.user);
-        // 仮登録の間はアクセス制限を強めるため、直ちにサインアウトしてログイン画面に留める
-        await signOut(auth);
-        setInfo('仮登録です。メール内のリンクをクリックして本登録を完了してください。必要なら再送できます。');
-      } else {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
-        setInfo('ログイン成功');
-      }
-      if (mode !== 'register') {
-        router.push('/timeline');
-      }
-    } catch (err: any) {
-  setError(mapAuthError(err.code || 'unknown'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGoogle() {
-    setError(null);
-    setInfo(null);
-    setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const cred = await signInWithPopup(auth, provider);
-      await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
-      setInfo('Google ログイン成功');
-      router.push('/timeline');
-    } catch (err: any) {
-  setError(mapAuthError(err.code || 'unknown'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleTwitter() {
-    setError(null);
-    setInfo(null);
-    setLoading(true);
-    try {
-      const result = await signInWithTwitter();
-      
-      // ポップアップ成功の場合
-      if (result) {
-        setInfo('X (Twitter) ログイン成功');
-        router.push('/timeline');
-      } else {
-        // リダイレクトにフォールバックした場合
-        setInfo('認証ページにリダイレクトしています...');
-      }
-    } catch (err: any) {
-      setError(translateTwitterAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Handle 重複リアルタイムチェック (debounce)
-  useEffect(()=>{
-    if (mode !== 'register') return;
-    setHandleError(null);
-    if (!handle) { setHandleStatus('idle'); return; }
-  if (!basicHandleValid(handle)) { setHandleStatus('invalid'); setHandleError('形式: 英数字と_ 3〜20文字'); return; }
-  const blockedReason = getHandleBlockReason(handle);
-  if (blockedReason) { setHandleStatus('invalid'); setHandleError(blockedReason); return; }
-    let active = true;
-    setHandleStatus('checking');
-    const t = setTimeout(async ()=>{
-      try {
-        const taken = await isHandleTaken(handle);
-        if (!active) return;
-        setHandleStatus(taken ? 'taken':'ok');
-        setHandleError(taken ? '既に使われています':'');
-      } catch (e:any){
-        if (!active) return;
-        setHandleStatus('invalid');
-        setHandleError('チェック失敗');
-      }
-    }, 450);
-    return ()=>{ active=false; clearTimeout(t); };
-  }, [handle, mode]);
+  const {
+    mode,
+    switchMode,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    displayName,
+    setDisplayName,
+    handle,
+    setHandle,
+    loading,
+    error,
+    info,
+    showPwd,
+    setShowPwd,
+    showConfirm,
+    setShowConfirm,
+    pwdStrength,
+    mismatch,
+    handleStatus,
+    handleError,
+    handleSubmit,
+    handleGoogle,
+    handleTwitter,
+  } = useAuth();
 
   return (
     <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
       <div className="max-w-md w-full mx-auto p-6">
-      <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">Virtualbum</h1>
-      <div className="flex gap-2 mb-4">
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === 'login' ? 'accent' : 'ghost'}
-          onClick={() => { setMode('login'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
-          disabled={loading}
-        >
-          ログイン
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === 'register' ? 'accent' : 'ghost'}
-          onClick={() => { setMode('register'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
-          disabled={loading}
-        >
-          新規登録
-        </Button>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
-        {mode==='register' && (
-          <div>
-            <label className="block text-sm font-medium mb-1">ユーザー名 (表示名 / 重複可)</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={e=>setDisplayName(e.target.value.slice(0,40))}
-              className="input-underline"
-              disabled={loading}
-              placeholder="例: VR太郎"
-            />
-            {getDisplayNameBlockReason(displayName) && <p className="text-xs text-red-600 mt-1" role="alert">{getDisplayNameBlockReason(displayName)}</p>}
-          </div>
-        )}
-        {mode==='register' && (
-          <div>
-            <label className="block text-sm font-medium mb-1">ユーザーID (@無し / 一意)</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={handle}
-                onChange={e=>setHandle(e.target.value.toLowerCase())}
-                className={`input-underline flex-1 ${(handleStatus==='taken'||handleStatus==='invalid')?'error':''}`}
-                disabled={loading}
-                placeholder="例: taro_vr"
-                aria-invalid={handleStatus==='taken'||handleStatus==='invalid'}
-              />
-              <span className="text-xs fg-subtle w-16">
-                {handleStatus==='idle' && ''}
-                {handleStatus==='checking' && '確認中'}
-                {handleStatus==='ok' && '利用可'}
-                {handleStatus==='taken' && '使用不可'}
-                {handleStatus==='invalid' && '形式'}
-              </span>
-            </div>
-            {handleError && <p className="text-xs text-red-600 mt-1" role="alert">{handleError}</p>}
-          </div>
-        )}
-        <div>
-        <label className="block text-sm font-medium mb-1">メールアドレス</label>
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          className="input-underline"
-          required
-          autoComplete="email"
-          disabled={loading}
+        <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">Virtualbum</h1>
+        
+        <AuthModeSwitch
+          mode={mode}
+          loading={loading}
+          onSwitch={switchMode}
         />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">パスワード</label>
-          <div className="flex items-center gap-2">
-            <input
-              type={showPwd ? 'text':'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="input-underline flex-1"
-              required
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              disabled={loading}
-            />
-            <button type="button" onClick={()=>setShowPwd(s=>!s)} className="text-xs link-accent w-16" aria-label="パスワード表示切替">{showPwd?'隠す':'表示'}</button>
-          </div>
-          {mode === 'login' && (
-            <div className="mt-2">
-              <Link href="/settings/forgot-password" className="text-xs link-accent">
-                パスワードを忘れた方
-              </Link>
-            </div>
-          )}
-          {mode==='register' && (
-            <div className="mt-2 pw-strength-wrapper" aria-live="polite">
-              <div className={`pw-strength-bar ${pwdStrength.cls}`}> <span style={{width: pwdStrength.percent+'%'}}></span> </div>
-              {pwdStrength.label && <p className="pw-strength-label">強度: {pwdStrength.label}</p>}
-            </div>
-          )}
-        </div>
-        {mode === 'register' && (
-          <div>
-            <label className="block text-sm font-medium mb-1">パスワード（確認）</label>
-            <div className="flex items-center gap-2">
-              <input
-                type={showConfirm ? 'text':'password'}
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                className={`input-underline flex-1 ${mismatch ? 'error':''}`}
-                required
-                autoComplete="new-password"
-                disabled={loading}
-                aria-invalid={!!mismatch}
-              />
-              <button type="button" onClick={()=>setShowConfirm(s=>!s)} className="text-xs link-accent w-16" aria-label="確認パスワード表示切替">{showConfirm?'隠す':'表示'}</button>
-            </div>
-            {mismatch && <p className="text-xs text-red-600 mt-1" role="alert">{mismatch}</p>}
-          </div>
-        )}
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        {info && (
-          <div className="text-xs fg-muted surface-alt border border-base rounded p-2">
-            <p>{info}</p>
-            {mode==='register' && (
-              <div className="mt-2">
-                <button type="button" className="text-xs link-accent" disabled={loading} onClick={async ()=>{
-                  try {
-                    // 再送は匿名状態でも currentUser が居ないため不可。再送したい場合は再度登録メールで試みてください、の案内にするか、
-                    // 一旦サインインして即座に sendEmailVerification→signOut のフローを追加する必要がある。
-                    // ここでは簡便のため再登録ボタンの利用を案内します。
-                    setInfo('確認メールが届かない場合は、メールアドレスを再確認の上、もう一度登録をお試しください。');
-                  } catch(e:any){ /* no-op */ }
-                }}>確認メールを再送</button>
-              </div>
-            )}
-          </div>
-        )}
-        <Button
-          type="submit"
-          variant="accent"
-          fullWidth
-          isLoading={loading}
-          disabled={loading}
-        >
-          {loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}
-        </Button>
-      </form>
-      <div className="mt-6 space-y-2">
-        <Button
-          type="button"
-          variant="ghost"
-          fullWidth
-          isLoading={loading}
-          onClick={handleGoogle}
-          disabled={loading}
-        >
-          {loading ? '...' : 'Google で続行'}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          fullWidth
-          isLoading={loading}
-          onClick={handleTwitter}
-          disabled={loading}
-        >
-          {loading ? '...' : 'X で続行'}
-        </Button>
-      </div>
+        
+        <AuthForm
+          mode={mode}
+          email={email}
+          password={password}
+          confirmPassword={confirmPassword}
+          displayName={displayName}
+          handle={handle}
+          loading={loading}
+          error={error}
+          info={info}
+          showPwd={showPwd}
+          showConfirm={showConfirm}
+          pwdStrength={pwdStrength}
+          mismatch={mismatch}
+          handleStatus={handleStatus}
+          handleError={handleError}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+          onDisplayNameChange={setDisplayName}
+          onHandleChange={setHandle}
+          onShowPwdToggle={() => setShowPwd(s => !s)}
+          onShowConfirmToggle={() => setShowConfirm(s => !s)}
+          onSubmit={handleSubmit}
+        />
+        
+        <SocialLoginButtons
+          loading={loading}
+          onGoogle={handleGoogle}
+          onTwitter={handleTwitter}
+        />
       </div>
     </div>
   );
